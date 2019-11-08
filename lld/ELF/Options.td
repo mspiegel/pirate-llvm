@@ -132,6 +132,8 @@ def emit_relocs: F<"emit-relocs">, HelpText<"Generate relocations in output">;
 def enable_new_dtags: F<"enable-new-dtags">,
   HelpText<"Enable new dynamic tags (default)">;
 
+defm enclave: Eq<"enclave", "Name of the GAPS enclave to emit an executable for">;
+
 def end_group: F<"end-group">,
   HelpText<"Ignored for compatibility with GNU unless you pass --warn-backrefs">;
 

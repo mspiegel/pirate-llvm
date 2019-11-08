@@ -71,6 +71,14 @@ llvm::Optional<std::string> searchScript(StringRef path);
 llvm::Optional<std::string> searchLibraryBaseName(StringRef path);
 llvm::Optional<std::string> searchLibrary(StringRef path);
 
+struct Enclave {
+  const char *name;
+  uint32_t captabIndex;
+  uint32_t entrypointIndex;
+};
+
+extern Enclave *enclave;
+
 } // namespace elf
 } // namespace lld
 

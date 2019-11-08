@@ -94,6 +94,7 @@ struct Configuration {
   llvm::StringRef dynamicLinker;
   llvm::StringRef dwoDir;
   llvm::StringRef entry;
+  llvm::StringRef enclave;
   llvm::StringRef emulation;
   llvm::StringRef fini;
   llvm::StringRef init;

@@ -71,6 +71,7 @@ namespace elf {
 
 Configuration *config;
 LinkerDriver *driver;
+Enclave *enclave;
 
 static void setConfigs(opt::InputArgList &args);
 static void readConfigs(opt::InputArgList &args);
@@ -866,6 +867,10 @@ static void readConfigs(opt::InputArgList &args) {
       OPT_call_graph_profile_sort, OPT_no_call_graph_profile_sort, true);
   config->enableNewDtags =
       args.hasFlag(OPT_enable_new_dtags, OPT_disable_new_dtags, true);
+  config->enclave = args.getLastArgValue(OPT_enclave);
+  // <><><>
+  if (!config->enclave.empty())
+    warn("Emiting executable for enclave " + config->enclave);
   config->entry = args.getLastArgValue(OPT_entry);
   config->executeOnly =
       args.hasFlag(OPT_execute_only, OPT_no_execute_only, false);
@@ -1579,6 +1584,31 @@ static Symbol *addUndefined(StringRef name) {
       Undefined{nullptr, name, STB_GLOBAL, STV_DEFAULT, 0});
 }
 
+template <typename ELFT>
+static void readGAPSEnclavesSection(InputSectionBase *s) {
+  auto enclaves = s->getDataAs<Enclave>();
+
+  for (auto e = enclaves.begin(); e < enclaves.end(); ++e) {
+    warn("Found an enclave named " + std::to_string((unsigned long)e->name)
+        + ", captab index " + std::to_string(e->captabIndex)
+        + ", entrypoint index " + std::to_string(e->entrypointIndex));
+  }
+}
+
+template <typename ELFT>
+static void readGAPSSection(InputSectionBase *s) {
+  if (s->name == ".gaps.enclaves") {
+    warn("Found a .gaps.enclaves section");
+    readGAPSEnclavesSection<ELFT>(s);
+  } else if (s->name == ".gaps.capacities") {
+    warn("Found a .gaps.capacities section");
+  } else if (s->name == ".gaps.reqtab") {
+    warn("Found a .gaps.reqtab section");
+  } else if (s->name == ".gaps.captab") {
+    warn("Found a .gaps.captab section");
+  }
+}
+
 // This function is where all the optimizations of link-time
 // optimization takes place. When LTO is in use, some input files are
 // not in native object file format but in the LLVM bitcode format.
@@ -1885,6 +1915,12 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   llvm::erase_if(inputSections, [](InputSectionBase *s) {
     if (s->type == SHT_LLVM_SYMPART) {
       readSymbolPartitionSection<ELFT>(s);
+      return true;
+    }
+
+    // Handle GAPS sections
+    if (!config->enclave.empty() && s->name.startswith(".gaps")) {
+      readGAPSSection<ELFT>(s);
       return true;
     }
 
