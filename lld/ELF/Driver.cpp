@@ -71,7 +71,7 @@ namespace elf {
 
 Configuration *config;
 LinkerDriver *driver;
-Enclave *enclave;
+GapsSections *gaps;
 
 static void setConfigs(opt::InputArgList &args);
 static void readConfigs(opt::InputArgList &args);
@@ -96,6 +96,7 @@ bool link(ArrayRef<const char *> args, bool canExitEarly, raw_ostream &error) {
   driver = make<LinkerDriver>();
   script = make<LinkerScript>();
   symtab = make<SymbolTable>();
+  gaps = make<GapsSections>();
 
   tar = nullptr;
   memset(&in, 0, sizeof(in));
@@ -1584,28 +1585,36 @@ static Symbol *addUndefined(StringRef name) {
       Undefined{nullptr, name, STB_GLOBAL, STV_DEFAULT, 0});
 }
 
-template <typename ELFT>
-static void readGAPSEnclavesSection(InputSectionBase *s) {
-  auto enclaves = s->getDataAs<Enclave>();
-
-  for (auto e = enclaves.begin(); e < enclaves.end(); ++e) {
-    warn("Found an enclave named " + std::to_string((unsigned long)e->name)
-        + ", captab index " + std::to_string(e->captabIndex)
-        + ", entrypoint index " + std::to_string(e->entrypointIndex));
-  }
+llvm::StringRef GapsSections::string(uint64_t s) {
+  return StringRef(strtab + s);
 }
 
-template <typename ELFT>
-static void readGAPSSection(InputSectionBase *s) {
+void GapsSections::caps(uint32_t offset, std::vector<llvm::StringRef> &cs) {
+  cs.clear();
+  for (auto i = captab + offset; *i; ++i)
+    for (auto j = *i; j; j = capabilities[j].cap_parent) {
+      warn(std::string("Adding capability name: ") + string(capabilities[j].cap_name));
+      cs.emplace_back(string(capabilities[j].cap_name));
+    }
+}
+
+//template <typename ELFT>
+static void readGapsSection(InputSectionBase *s) {
   if (s->name == ".gaps.enclaves") {
     warn("Found a .gaps.enclaves section");
-    readGAPSEnclavesSection<ELFT>(s);
-  } else if (s->name == ".gaps.capacities") {
-    warn("Found a .gaps.capacities section");
+    gaps->enclaves = s->getDataAs<Elf64_GAPS_enclave>();
   } else if (s->name == ".gaps.reqtab") {
     warn("Found a .gaps.reqtab section");
+    gaps->reqtab = s->getDataAs<Elf64_GAPS_symreq>();
+  } else if (s->name == ".gaps.capabilities") {
+    warn("Found a .gaps.capabilities section");
+    gaps->capabilities = s->getDataAs<Elf64_GAPS_capability>();
   } else if (s->name == ".gaps.captab") {
     warn("Found a .gaps.captab section");
+    gaps->captab = s->getDataAs<uint16_t>().data();
+  } else if (s->name == ".gaps.strtab") {
+    warn("Found a .gaps.strtab section");
+    gaps->strtab = s->getDataAs<char>().data();
   }
 }
 
@@ -1920,7 +1929,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
     // Handle GAPS sections
     if (!config->enclave.empty() && s->name.startswith(".gaps")) {
-      readGAPSSection<ELFT>(s);
+      readGapsSection(s);
       return true;
     }
 
@@ -1929,6 +1938,43 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
     return config->strip != StripPolicy::None &&
            (s->name.startswith(".debug") || s->name.startswith(".zdebug"));
   });
+
+  if (!config->enclave.empty()) {
+    if (!gaps->enclaves.data())
+      fatal("GAPS-aware linking requested, but no .gaps.enclaves section found");
+    if (!gaps->reqtab.data())
+      fatal("GAPS-aware linking requested, but no .gaps.reqtab section found");
+    if (!gaps->capabilities.data())
+      fatal("GAPS-aware linking requested, but no .gaps.capabilities section found");
+    if (!gaps->captab)
+      fatal("GAPS-aware linking requested, but no .gaps.captab section found");
+    if (!gaps->strtab)
+      fatal("GAPS-aware linking requested, but no .gaps.strtab section found");
+
+    warn("Found the following enclaves:");
+    for (auto e = gaps->enclaves.begin(); e < gaps->enclaves.end(); ++e) {
+      warn("\t" + gaps->string(e->enc_name)
+          + ": entrypoint=" + std::to_string(e->enc_entry)
+          + " capabilities=" + std::to_string(e->enc_cap));
+    }
+    warn("Found the following capabilities:");
+    for (auto c = gaps->capabilities.begin(); c < gaps->capabilities.end(); ++c) {
+      warn("\t" + gaps->string(c->cap_name) + ": parent="
+          + gaps->string(gaps->capabilities[c->cap_parent].cap_name));
+    }
+    warn("Found the following symbol requirements:");
+    for (auto r = gaps->reqtab.begin(); r < gaps->reqtab.end(); ++r) {
+      std::vector<llvm::StringRef> cs;
+      gaps->caps(r->sr_cap, cs);
+      auto c = cs.begin();
+      std::string s = c->data();
+      for (++c; c < cs.end(); ++c) {
+        s += ",";
+        s += c->data();
+      }
+      warn("\tcapabilities=" + s + " enclave=" + gaps->string(gaps->enclaves[r->sr_enc].enc_name));
+    }
+  }
 
   // Now that the number of partitions is fixed, save a pointer to the main
   // partition.

@@ -71,13 +71,32 @@ llvm::Optional<std::string> searchScript(StringRef path);
 llvm::Optional<std::string> searchLibraryBaseName(StringRef path);
 llvm::Optional<std::string> searchLibrary(StringRef path);
 
-struct Enclave {
-  const char *name;
-  uint32_t captabIndex;
-  uint32_t entrypointIndex;
+struct Elf64_GAPS_enclave {
+  uint64_t enc_name;
+  uint32_t enc_cap;
+  uint32_t enc_entry;
 };
 
-extern Enclave *enclave;
+struct Elf64_GAPS_symreq {
+  uint32_t sr_cap;
+  uint32_t sr_enc;
+};
+
+struct Elf64_GAPS_capability {
+  uint64_t cap_name;
+  uint32_t cap_parent;
+};
+
+struct GapsSections {
+  ArrayRef<Elf64_GAPS_enclave> enclaves;
+  ArrayRef<Elf64_GAPS_symreq> reqtab;
+  ArrayRef<Elf64_GAPS_capability> capabilities;
+  const uint16_t *captab;
+  const char *strtab;
+
+  llvm::StringRef string(uint64_t s);
+  void caps(uint32_t offset, std::vector<llvm::StringRef> &out);
+};
 
 } // namespace elf
 } // namespace lld
