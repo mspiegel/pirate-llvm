@@ -71,7 +71,11 @@ namespace elf {
 
 Configuration *config;
 LinkerDriver *driver;
-GapsSections *gaps;
+
+static std::vector<InputSectionBase *> enclavesSections;
+static std::vector<InputSectionBase *> symreqsSections;
+static std::vector<Enclave> enclaves;
+static std::vector<GapsRequirements> requirements;
 
 static void setConfigs(opt::InputArgList &args);
 static void readConfigs(opt::InputArgList &args);
@@ -91,12 +95,15 @@ bool link(ArrayRef<const char *> args, bool canExitEarly, raw_ostream &error) {
   bitcodeFiles.clear();
   objectFiles.clear();
   sharedFiles.clear();
+  enclavesSections.clear();
+  symreqsSections.clear();
+  enclaves.clear();
+  requirements.clear();
 
   config = make<Configuration>();
   driver = make<LinkerDriver>();
   script = make<LinkerScript>();
   symtab = make<SymbolTable>();
-  gaps = make<GapsSections>();
 
   tar = nullptr;
   memset(&in, 0, sizeof(in));
@@ -1585,36 +1592,20 @@ static Symbol *addUndefined(StringRef name) {
       Undefined{nullptr, name, STB_GLOBAL, STV_DEFAULT, 0});
 }
 
-llvm::StringRef GapsSections::string(uint64_t s) {
-  return StringRef(strtab + s);
-}
-
-void GapsSections::caps(uint32_t offset, std::vector<llvm::StringRef> &cs) {
-  cs.clear();
-  for (auto i = captab + offset; *i; ++i)
-    for (auto j = *i; j; j = capabilities[j].cap_parent) {
-      warn(std::string("Adding capability name: ") + string(capabilities[j].cap_name));
-      cs.emplace_back(string(capabilities[j].cap_name));
-    }
-}
-
-//template <typename ELFT>
+template <typename ELFT>
 static void readGapsSection(InputSectionBase *s) {
   if (s->name == ".gaps.enclaves") {
-    warn("Found a .gaps.enclaves section");
-    gaps->enclaves = s->getDataAs<Elf64_GAPS_enclave>();
-  } else if (s->name == ".gaps.reqtab") {
-    warn("Found a .gaps.reqtab section");
-    gaps->reqtab = s->getDataAs<Elf64_GAPS_symreq>();
+    s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>().data();
+    enclavesSections.push_back(s);
+  } else if (s->name == ".gaps.symreqs") {
+    s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>().data();
+    symreqsSections.push_back(s);
   } else if (s->name == ".gaps.capabilities") {
-    warn("Found a .gaps.capabilities section");
-    gaps->capabilities = s->getDataAs<Elf64_GAPS_capability>();
+    s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>().data();
   } else if (s->name == ".gaps.captab") {
-    warn("Found a .gaps.captab section");
-    gaps->captab = s->getDataAs<uint16_t>().data();
+    s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>().data();
   } else if (s->name == ".gaps.strtab") {
-    warn("Found a .gaps.strtab section");
-    gaps->strtab = s->getDataAs<char>().data();
+    s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>().data();
   }
 }
 
@@ -1929,7 +1920,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
     // Handle GAPS sections
     if (!config->enclave.empty() && s->name.startswith(".gaps")) {
-      readGapsSection(s);
+      readGapsSection<ELFT>(s);
       return true;
     }
 
@@ -1940,39 +1931,49 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   });
 
   if (!config->enclave.empty()) {
-    if (!gaps->enclaves.data())
-      fatal("GAPS-aware linking requested, but no .gaps.enclaves section found");
-    if (!gaps->reqtab.data())
-      fatal("GAPS-aware linking requested, but no .gaps.reqtab section found");
-    if (!gaps->capabilities.data())
-      fatal("GAPS-aware linking requested, but no .gaps.capabilities section found");
-    if (!gaps->captab)
-      fatal("GAPS-aware linking requested, but no .gaps.captab section found");
-    if (!gaps->strtab)
-      fatal("GAPS-aware linking requested, but no .gaps.strtab section found");
-
-    warn("Found the following enclaves:");
-    for (auto e = gaps->enclaves.begin(); e < gaps->enclaves.end(); ++e) {
-      warn("\t" + gaps->string(e->enc_name)
-          + ": entrypoint=" + std::to_string(e->enc_entry)
-          + " capabilities=" + std::to_string(e->enc_cap));
-    }
-    warn("Found the following capabilities:");
-    for (auto c = gaps->capabilities.begin(); c < gaps->capabilities.end(); ++c) {
-      warn("\t" + gaps->string(c->cap_name) + ": parent="
-          + gaps->string(gaps->capabilities[c->cap_parent].cap_name));
-    }
-    warn("Found the following symbol requirements:");
-    for (auto r = gaps->reqtab.begin(); r < gaps->reqtab.end(); ++r) {
-      std::vector<llvm::StringRef> cs;
-      gaps->caps(r->sr_cap, cs);
-      auto c = cs.begin();
-      std::string s = c->data();
-      for (++c; c < cs.end(); ++c) {
-        s += ",";
-        s += c->data();
+    for (auto s = enclavesSections.begin(); s < enclavesSections.end(); ++s) {
+      auto es = (*s)->getDataAs<Elf_GAPS_enc<ELFT>>();
+      auto f = (*s)->getFile<ELFT>();
+      for (auto e = es.begin(); e < es.end(); ++e) {
+        enclaves.emplace_back(
+          f->getGapsStrtabEntry(e->enc_name),
+          f->symbols[e->enc_entry]
+        );
+        f->getGapsCaptabEntry(e->enc_cap, enclaves.back().capabilities);
       }
-      warn("\tcapabilities=" + s + " enclave=" + gaps->string(gaps->enclaves[r->sr_enc].enc_name));
+    }
+
+    for (auto e = enclaves.begin(); e < enclaves.end(); ++e) {
+      std::string caps = "";
+      for (auto c = e->capabilities.begin(); c < e->capabilities.end(); caps += ",", ++c)
+        caps += *c;
+      warn("Found an enclave with name " + e->name
+          + ", entrypoint " + e->entrypoint->getName()
+          + ", and capabilities " + caps);
+    }
+
+    for (auto s = symreqsSections.begin(); s < symreqsSections.end(); ++s) {
+      auto ss = (*s)->getDataAs<Elf_GAPS_req<ELFT>>();
+      auto f = (*s)->getFile<ELFT>();
+      for (auto r = ss.begin(); r < ss.end(); ++r) {
+        requirements.emplace_back(
+          f->getGapsStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name),
+          &f->getSymbol(r->req_sym)
+        );
+        f->getGapsCaptabEntry(r->req_cap, requirements.back().capabilities);
+      }
+    }
+
+    for (auto r = requirements.begin(); r < requirements.end(); ++r) {
+      std::string caps = "";
+      for (auto c = r->capabilities.begin(); c < r->capabilities.end(); ++c) {
+        caps += *c;
+        if (c+1 == r->capabilities.end())
+          caps += ",";
+      }
+      warn("Found a symbol " + r->symbol->getName() + " with requirements:"
+          + " capabilities " + caps
+          + " and enclave " + r->enclave);
     }
   }
 

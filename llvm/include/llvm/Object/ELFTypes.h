@@ -757,6 +757,29 @@ template <class ELFT> struct Elf_Mips_ABIFlags {
   Elf_Word flags2;   // General flags
 };
 
+template <class ELFT> struct Elf_GAPS_enc {
+  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
+  Elf_Addr enc_name;
+  Elf_Word enc_cap;
+  Elf_Half enc_entry;
+  Elf_Half enc_padding;
+};
+
+template <class ELFT> struct Elf_GAPS_req {
+  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
+  Elf_Word req_cap;
+  Elf_Word req_enc;
+  Elf_Half req_sym;
+  Elf_Half req_padding;
+};
+
+template <class ELFT> struct Elf_GAPS_cap {
+  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
+  Elf_Addr cap_name;
+  Elf_Word cap_parent;
+  Elf_Word cap_padding;
+};
+
 } // end namespace object.
 } // end namespace llvm.
 

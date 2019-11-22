@@ -611,6 +611,15 @@ void ObjFile<ELFT>::initializeSections(bool ignoreComdats) {
   }
 }
 
+template <typename ELFT>
+void ObjFile<ELFT>::getGapsCaptabEntry(typename ELFT::Word offset, std::vector<std::string> &out) {
+  assert(gaps.captab);
+  out.clear();
+  for (int i = offset; gaps.captab[i]; ++i)
+    for (int j = gaps.captab[i]; j; j = gaps.capabilities[j].cap_parent)
+      out.emplace_back(getGapsStrtabEntry(gaps.capabilities[j].cap_name));
+}
+
 // For ARM only, to set the EF_ARM_ABI_FLOAT_SOFT or EF_ARM_ABI_FLOAT_HARD
 // flag in the ELF Header we need to look at Tag_ABI_VFP_args to find out how
 // the input objects have been compiled.

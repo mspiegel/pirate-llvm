@@ -249,6 +249,22 @@ public:
   // SHT_LLVM_CALL_GRAPH_PROFILE table
   ArrayRef<Elf_CGProfile> cgProfile;
 
+  struct {
+    const llvm::object::Elf_GAPS_enc<ELFT> *enclaves;
+    const llvm::object::Elf_GAPS_cap<ELFT> *capabilities;
+    const llvm::object::Elf_GAPS_req<ELFT> *symreqs;
+    const uint32_t *captab;
+    const char *strtab;
+  } gaps;
+
+
+  StringRef getGapsStrtabEntry(typename ELFT::Addr offset) {
+    assert(gaps.strtab);
+    return gaps.strtab + offset;
+  }
+
+  void getGapsCaptabEntry(typename ELFT::Word offset, std::vector<std::string> &out);
+
 private:
   void initializeSections(bool ignoreComdats);
   void initializeSymbols();
