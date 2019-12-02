@@ -871,9 +871,6 @@ static void readConfigs(opt::InputArgList &args) {
   config->enableNewDtags =
       args.hasFlag(OPT_enable_new_dtags, OPT_disable_new_dtags, true);
   config->enclave = args.getLastArgValue(OPT_enclave);
-  // <><><>
-  if (!config->enclave.empty())
-    warn("Emiting executable for enclave " + config->enclave);
   config->entry = args.getLastArgValue(OPT_entry);
   config->executeOnly =
       args.hasFlag(OPT_execute_only, OPT_no_execute_only, false);
@@ -885,7 +882,9 @@ static void readConfigs(opt::InputArgList &args) {
   config->fixCortexA8 = args.hasArg(OPT_fix_cortex_a8);
   config->forceBTI = args.hasArg(OPT_force_bti);
   config->requireCET = args.hasArg(OPT_require_cet);
-  config->gcSections = args.hasFlag(OPT_gc_sections, OPT_no_gc_sections, false);
+  config->gcSections =
+    args.hasFlag(OPT_gc_sections, OPT_no_gc_sections, false) ||
+    args.hasFlag(OPT_enclave, OPT_no_gc_sections, false);
   config->gnuUnique = args.hasFlag(OPT_gnu_unique, OPT_no_gnu_unique, true);
   config->gdbIndex = args.hasFlag(OPT_gdb_index, OPT_no_gdb_index, false);
   config->icf = getICF(args);
@@ -1590,14 +1589,21 @@ static Symbol *addUndefined(StringRef name) {
 template <typename ELFT>
 static void readGapsSection(InputSectionBase *s) {
   if (s->name == ".gaps.enclaves") {
+    warn("<><><> Found .gaps.enclaves with size " + std::to_string(s->data().size())
+        + " in file " + s->getFile<ELFT>()->getName());
     s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>();
+    warn("<><><> It has " + std::to_string(s->getFile<ELFT>()->gaps.enclaves.size()) + " entries");
   } else if (s->name == ".gaps.symreqs") {
+    warn("<><><> Found .gaps.symreqs");
     s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>();
   } else if (s->name == ".gaps.capabilities") {
+    warn("<><><> Found .gaps.capabilities");
     s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>();
   } else if (s->name == ".gaps.captab") {
+    warn("<><><> Found .gaps.captab");
     s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
   } else if (s->name == ".gaps.strtab") {
+    warn("<><><> Found .gaps.strtab");
     s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
   }
 }
@@ -1731,6 +1737,74 @@ template <class ELFT> static uint32_t getAndFeatures() {
     ret |= GNU_PROPERTY_AARCH64_FEATURE_1_PAC;
 
   return ret;
+}
+
+template <typename ELFT>
+void processGapsEnclave() {
+  for (InputFile *f_ : objectFiles) {
+    warn("<><><> Processing file " + f_->getName());
+    auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
+    if (!f)
+      continue;
+    warn("<><><> It's an ObjFile!");
+
+    warn("<><><> Found " + std::to_string(f->gaps.enclaves.size()) + " enclaves");
+    for (auto e = f->gaps.enclaves.begin() + 1; e < f->gaps.enclaves.end(); ++e) {
+      StringRef name = f->gaps.getStrtabEntry(e->enc_name);
+
+      warn("<><><> Found enclave named " + name);
+      if (name.equals(config->enclave)) {
+        warn(StringRef("<><><> ") + (enclave ? "Enclave already defined" : "Allocating new enclave"));
+        enclave = enclave ? enclave : new Enclave(config->enclave);
+
+        if (enclave->entrypoint && e->enc_entry)
+          fatal("Multiple entrypoints specified for enclave " + enclave->name);
+        else
+          enclave->entrypoint = &f->getSymbol(e->enc_entry);
+
+        std::vector<StringRef> caps;
+        f->gaps.getSuppliedCaps(e->enc_cap, caps);
+        enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
+      }
+    }
+  }
+}
+
+template <typename ELFT>
+void processGapsRequirements() {
+  for (InputFile *f_ : objectFiles) {
+    warn("<><><> Processing file " + f_->getName());
+    auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
+    if (!f)
+      continue;
+    warn("<><><> It's an ObjFile!");
+
+    for (auto r = f->gaps.symreqs.begin(); r < f->gaps.symreqs.end(); ++r) {
+      std::vector<StringRef> caps;
+      f->gaps.getRequiredCaps(r->req_cap, caps);
+      const char *enclaveName = r->req_enc ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data() : nullptr;
+      Symbol *symbol = &f->getSymbol(r->req_sym);
+
+      requirements.emplace_back(caps, enclaveName, symbol);
+    }
+  }
+}
+
+void addGapsMain() {
+  if (!enclave)
+    fatal("No enclave named " + config->enclave + " defined");
+  if (!enclave->entrypoint)
+    fatal("No entrypoint for " + config->enclave);
+  if (!enclave->entrypoint->getName().equals("main")) {
+    auto sym = reinterpret_cast<Symbol *>(make<SymbolUnion>());
+    sym->replace(*enclave->entrypoint);
+    sym->setName({"main", 4});
+    symtab->addSymbol(*sym);
+  }
+}
+
+void checkGapsRequirements() {
+  // TODO
 }
 
 // Do actual linking. Note that when this function is called,
@@ -1924,37 +1998,9 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   });
 
   if (!config->enclave.empty()) {
-    enclave = new Enclave(config->enclave);
-
-    for (InputFile *f_ : objectFiles) {
-      auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
-      if (!f)
-        continue;
-
-      for (auto e = f->gaps.enclaves.begin(); e < f->gaps.enclaves.end(); ++e) {
-        StringRef name = f->gaps.getStrtabEntry(e->enc_name);
-
-        if (name.equals(enclave->name)) {
-          if (enclave->entrypoint && e->enc_entry)
-            fatal("Multiple entrypoints specified for enclave " + enclave->name);
-          else
-            enclave->entrypoint = &f->getSymbol(e->enc_entry);
-
-          std::vector<StringRef> caps;
-          f->gaps.getCaptabEntry(e->enc_cap, caps);
-          enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
-        }
-      }
-
-      for (auto r = f->gaps.symreqs.begin(); r < f->gaps.symreqs.end(); ++r) {
-        std::vector<StringRef> caps;
-        f->gaps.getCaptabEntry(r->req_cap, caps);
-        const char *enclaveName = r->req_enc ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data() : nullptr;
-        Symbol *symbol = &f->getSymbol(r->req_sym);
-
-        requirements.emplace_back(caps, enclaveName, symbol);
-      }
-    }
+    processGapsEnclave<ELFT>();
+    processGapsRequirements<ELFT>();
+    addGapsMain();
   }
 
   // <><><>
@@ -2023,6 +2069,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // Garbage collection and removal of shared symbols from unused shared objects.
   markLive<ELFT>();
   demoteSharedSymbols();
+  checkGapsRequirements();
 
   // Make copies of any input sections that need to be copied into each
   // partition.

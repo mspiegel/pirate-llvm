@@ -62,14 +62,22 @@ template <typename ELFT> struct GapsSections {
   ArrayRef<char> strtab;
 
   StringRef getStrtabEntry(typename ELFT::Addr offset) {
-    return {strtab.data() + offset};
+    auto entry = strtab.data() + offset;
+    auto size = strlen(entry);
+    return {entry, size};
   }
 
-  void getCaptabEntry(typename ELFT::Word offset, std::vector<StringRef> &out) {
+  void getSuppliedCaps(typename ELFT::Word offset, std::vector<StringRef> &out) {
     out.clear();
     for (int i = offset; captab[i]; ++i)
       for (int j = captab[i]; j; j = capabilities[j].cap_parent)
         out.emplace_back(getStrtabEntry(capabilities[j].cap_name));
+  }
+
+  void getRequiredCaps(typename ELFT::Word offset, std::vector<StringRef> &out) {
+    out.clear();
+    for (int i = offset; captab[i]; ++i)
+      out.emplace_back(getStrtabEntry(capabilities[captab[i]].cap_name));
   }
 };
 
