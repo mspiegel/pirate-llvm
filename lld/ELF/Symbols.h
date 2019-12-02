@@ -52,15 +52,6 @@ struct StringRefZ {
   const uint32_t size;
 };
 
-struct GapsRequirements {
-  std::vector<std::string> capabilities;
-  StringRef enclave;
-  Symbol *symbol;
-
-  GapsRequirements(StringRef e, Symbol *s)
-    : capabilities(), enclave(e), symbol(s) {}
-};
-
 // The base class for real symbol classes.
 class Symbol {
 public:

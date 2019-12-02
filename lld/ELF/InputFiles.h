@@ -54,6 +54,25 @@ llvm::Optional<MemoryBufferRef> readFile(StringRef path);
 // Add symbols in File to the symbol table.
 void parseFile(InputFile *file);
 
+template <typename ELFT> struct GapsSections {
+  ArrayRef<llvm::object::Elf_GAPS_enc<ELFT>> enclaves;
+  ArrayRef<llvm::object::Elf_GAPS_cap<ELFT>> capabilities;
+  ArrayRef<llvm::object::Elf_GAPS_req<ELFT>> symreqs;
+  ArrayRef<uint32_t> captab;
+  ArrayRef<char> strtab;
+
+  StringRef getStrtabEntry(typename ELFT::Addr offset) {
+    return {strtab.data() + offset};
+  }
+
+  void getCaptabEntry(typename ELFT::Word offset, std::vector<StringRef> &out) {
+    out.clear();
+    for (int i = offset; captab[i]; ++i)
+      for (int j = captab[i]; j; j = capabilities[j].cap_parent)
+        out.emplace_back(getStrtabEntry(capabilities[j].cap_name));
+  }
+};
+
 // The root class of input files.
 class InputFile {
 public:
@@ -249,21 +268,7 @@ public:
   // SHT_LLVM_CALL_GRAPH_PROFILE table
   ArrayRef<Elf_CGProfile> cgProfile;
 
-  struct {
-    const llvm::object::Elf_GAPS_enc<ELFT> *enclaves;
-    const llvm::object::Elf_GAPS_cap<ELFT> *capabilities;
-    const llvm::object::Elf_GAPS_req<ELFT> *symreqs;
-    const uint32_t *captab;
-    const char *strtab;
-  } gaps;
-
-
-  StringRef getGapsStrtabEntry(typename ELFT::Addr offset) {
-    assert(gaps.strtab);
-    return gaps.strtab + offset;
-  }
-
-  void getGapsCaptabEntry(typename ELFT::Word offset, std::vector<std::string> &out);
+  GapsSections<ELFT> gaps;
 
 private:
   void initializeSections(bool ignoreComdats);

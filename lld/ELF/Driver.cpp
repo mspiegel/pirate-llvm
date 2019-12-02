@@ -72,10 +72,8 @@ namespace elf {
 Configuration *config;
 LinkerDriver *driver;
 
-static std::vector<InputSectionBase *> enclavesSections;
-static std::vector<InputSectionBase *> symreqsSections;
-static std::vector<Enclave> enclaves;
-static std::vector<GapsRequirements> requirements;
+static Enclave *enclave = nullptr;
+static std::vector<Requirements> requirements;
 
 static void setConfigs(opt::InputArgList &args);
 static void readConfigs(opt::InputArgList &args);
@@ -95,9 +93,6 @@ bool link(ArrayRef<const char *> args, bool canExitEarly, raw_ostream &error) {
   bitcodeFiles.clear();
   objectFiles.clear();
   sharedFiles.clear();
-  enclavesSections.clear();
-  symreqsSections.clear();
-  enclaves.clear();
   requirements.clear();
 
   config = make<Configuration>();
@@ -1595,17 +1590,15 @@ static Symbol *addUndefined(StringRef name) {
 template <typename ELFT>
 static void readGapsSection(InputSectionBase *s) {
   if (s->name == ".gaps.enclaves") {
-    s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>().data();
-    enclavesSections.push_back(s);
+    s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>();
   } else if (s->name == ".gaps.symreqs") {
-    s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>().data();
-    symreqsSections.push_back(s);
+    s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>();
   } else if (s->name == ".gaps.capabilities") {
-    s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>().data();
+    s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>();
   } else if (s->name == ".gaps.captab") {
-    s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>().data();
+    s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
   } else if (s->name == ".gaps.strtab") {
-    s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>().data();
+    s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
   }
 }
 
@@ -1931,49 +1924,52 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   });
 
   if (!config->enclave.empty()) {
-    for (auto s = enclavesSections.begin(); s < enclavesSections.end(); ++s) {
-      auto es = (*s)->getDataAs<Elf_GAPS_enc<ELFT>>();
-      auto f = (*s)->getFile<ELFT>();
-      for (auto e = es.begin(); e < es.end(); ++e) {
-        enclaves.emplace_back(
-          f->getGapsStrtabEntry(e->enc_name),
-          f->symbols[e->enc_entry]
-        );
-        f->getGapsCaptabEntry(e->enc_cap, enclaves.back().capabilities);
+    enclave = new Enclave(config->enclave);
+
+    for (InputFile *f_ : objectFiles) {
+      auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
+      if (!f)
+        continue;
+
+      for (auto e = f->gaps.enclaves.begin(); e < f->gaps.enclaves.end(); ++e) {
+        StringRef name = f->gaps.getStrtabEntry(e->enc_name);
+
+        if (name.equals(enclave->name)) {
+          if (enclave->entrypoint && e->enc_entry)
+            fatal("Multiple entrypoints specified for enclave " + enclave->name);
+          else
+            enclave->entrypoint = &f->getSymbol(e->enc_entry);
+
+          std::vector<StringRef> caps;
+          f->gaps.getCaptabEntry(e->enc_cap, caps);
+          enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
+        }
+      }
+
+      for (auto r = f->gaps.symreqs.begin(); r < f->gaps.symreqs.end(); ++r) {
+        std::vector<StringRef> caps;
+        f->gaps.getCaptabEntry(r->req_cap, caps);
+        const char *enclaveName = r->req_enc ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data() : nullptr;
+        Symbol *symbol = &f->getSymbol(r->req_sym);
+
+        requirements.emplace_back(caps, enclaveName, symbol);
       }
     }
+  }
 
-    for (auto e = enclaves.begin(); e < enclaves.end(); ++e) {
-      std::string caps = "";
-      for (auto c = e->capabilities.begin(); c < e->capabilities.end(); caps += ",", ++c)
-        caps += *c;
-      warn("Found an enclave with name " + e->name
-          + ", entrypoint " + e->entrypoint->getName()
-          + ", and capabilities " + caps);
-    }
+  // <><><>
+  if (enclave) {
+    warn("Enclave " + enclave->name + " has entrypoint "
+        + enclave->entrypoint->getName() + " and the following capabilities:");
+    for (const auto &c : enclave->capabilities)
+      warn("\t" + c);
 
-    for (auto s = symreqsSections.begin(); s < symreqsSections.end(); ++s) {
-      auto ss = (*s)->getDataAs<Elf_GAPS_req<ELFT>>();
-      auto f = (*s)->getFile<ELFT>();
-      for (auto r = ss.begin(); r < ss.end(); ++r) {
-        requirements.emplace_back(
-          f->getGapsStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name),
-          &f->getSymbol(r->req_sym)
-        );
-        f->getGapsCaptabEntry(r->req_cap, requirements.back().capabilities);
-      }
-    }
-
-    for (auto r = requirements.begin(); r < requirements.end(); ++r) {
-      std::string caps = "";
-      for (auto c = r->capabilities.begin(); c < r->capabilities.end(); ++c) {
-        caps += *c;
-        if (c+1 == r->capabilities.end())
-          caps += ",";
-      }
-      warn("Found a symbol " + r->symbol->getName() + " with requirements:"
-          + " capabilities " + caps
-          + " and enclave " + r->enclave);
+    for (const auto &r : requirements) {
+      warn("Symbol " + r.symbol->getName() + " requires " +
+        (r.enclave ? "enclave " + StringRef(r.enclave) : StringRef("no enclave")) +
+        " and the following capabilities:");
+      for (const auto &c : r.capabilities)
+        warn("\t" + c);
     }
   }
 
