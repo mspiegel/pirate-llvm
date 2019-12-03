@@ -3408,3 +3408,10 @@ def ObjCExternallyRetained : InheritableAttr {
   let Subjects = SubjectList<[NonParmVar, Function, Block, ObjCMethod]>;
   let Documentation = [ObjCExternallyRetainedDocs];
 }
+
+def Enclave : InheritableAttr {
+  let Spellings = [Clang<"enclave">];
+  let Subjects = SubjectList<[Function, GlobalVar]>;
+  let Documentation = [EnclaveDocs];
+  let Args = [StringArgument<"EnclaveName">];
+}

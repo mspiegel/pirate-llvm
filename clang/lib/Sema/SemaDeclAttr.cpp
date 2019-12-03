@@ -1866,6 +1866,16 @@ static void handleTLSModelAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   D->addAttr(::new (S.Context) TLSModelAttr(S.Context, AL, Model));
 }
 
+static void handleEnclaveAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  StringRef Name;
+  SourceLocation LiteralLoc;
+  // Check that it is a string.
+  if (!S.checkStringLiteralArgumentAttr(AL, 0, Name, &LiteralLoc))
+    return;
+
+  D->addAttr(::new (S.Context) EnclaveAttr(S.Context, AL, Name));
+}
+
 static void handleRestrictAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   QualType ResultType = getFunctionOrMethodResultType(D);
   if (ResultType->isAnyPointerType() || ResultType->isBlockPointerType()) {
@@ -7159,6 +7169,10 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
 
   case ParsedAttr::AT_MSAllocator:
     handleMSAllocatorAttr(S, D, AL);
+    break;
+
+  case ParsedAttr::AT_Enclave:
+    handleEnclaveAttr(S, D, AL);
     break;
   }
 }

@@ -847,6 +847,12 @@ enum : unsigned {
   SHT_LLVM_SYMPART = 0x6fff4c05,        // Symbol partition specification.
   SHT_LLVM_PART_EHDR = 0x6fff4c06,      // ELF header for loadable partition.
   SHT_LLVM_PART_PHDR = 0x6fff4c07,      // Phdrs for loadable partition.
+  SHT_LLVM_PART_CAPS = 0x6fff4c08,      // Phdrs for loadable partition.
+  SHT_LLVM_PART_REQS = 0x6fff4c09,      // Phdrs for loadable partition.
+  SHT_LLVM_PART_ENTR = 0x6fff4c0a,      // Phdrs for loadable partition.
+  SHT_LLVM_PART_CAPSTAB = 0x6fff4c0b,   // Phdrs for loadable partition.
+  SHT_LLVM_PART_STRTAB = 0x6fff4c0c,   // Phdrs for loadable partition.
+
   // Android's experimental support for SHT_RELR sections.
   // https://android.googlesource.com/platform/bionic/+/b7feec74547f84559a1467aca02708ff61346d2a/libc/include/elf.h#512
   SHT_ANDROID_RELR = 0x6fffff00,        // Relocation entries; only offsets.

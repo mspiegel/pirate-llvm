@@ -1482,6 +1482,11 @@ CodeGenModule::getMostBaseClasses(const CXXRecordDecl *RD) {
 void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
                                                            llvm::Function *F) {
   llvm::AttrBuilder B;
+  
+  if (F->hasFnAttribute("enclave")) {
+    auto attr = F->getFnAttribute("enclave");
+    B.addAttribute("enclave", attr.getValueAsString()); // XXX Eric: Find actual attribute value
+  }
 
   if (CodeGenOpts.UnwindTables)
     B.addAttribute(llvm::Attribute::UWTable);

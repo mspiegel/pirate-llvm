@@ -31,6 +31,8 @@ private:
                             const std::vector<Record *> &Records);
   void printStrBoolAttrClasses(raw_ostream &OS,
                                const std::vector<Record *> &Records);
+  void printStrAttrClasses(raw_ostream &OS,
+                               const std::vector<Record *> &Records);
 
   RecordKeeper &Records;
 };
@@ -101,8 +103,21 @@ void Attributes::emitFnAttrCompatCheck(raw_ostream &OS, bool IsStringAttr) {
   OS << "  }\n";
   OS << "};\n\n";
 
+  OS << "struct StrAttr {\n";
+  OS << "  static StringRef get(const Function &Fn,\n";
+  OS << "                    StringRef Kind) {\n";
+  OS << "    auto A = Fn.getFnAttribute(Kind);\n";
+  OS << "    return A.getValueAsString();\n";
+  OS << "  }\n\n";
+  OS << "  static void set(Function &Fn,\n";
+  OS << "                  StringRef Kind, StringRef Val) {\n";
+  OS << "    Fn.addFnAttr(Kind, Val);\n";
+  OS << "  }\n";
+  OS << "};\n\n";
+
   printEnumAttrClasses(OS ,Records.getAllDerivedDefinitions("EnumAttr"));
   printStrBoolAttrClasses(OS , Records.getAllDerivedDefinitions("StrBoolAttr"));
+  printStrAttrClasses(OS , Records.getAllDerivedDefinitions("StrAttr"));
 
   OS << "static inline bool hasCompatibleFnAttrs(const Function &Caller,\n"
      << "                                        const Function &Callee) {\n";
@@ -153,6 +168,19 @@ void Attributes::printStrBoolAttrClasses(raw_ostream &OS,
   OS << "// StrBoolAttr classes\n";
   for (const auto *R : Records) {
     OS << "struct " << R->getName() << "Attr : StrBoolAttr {\n";
+    OS << "  static StringRef getKind() {\n";
+    OS << "    return \"" << R->getValueAsString("AttrString") << "\";\n";
+    OS << "  }\n";
+    OS << "};\n";
+  }
+  OS << "\n";
+}
+
+void Attributes::printStrAttrClasses(raw_ostream &OS,
+                                         const std::vector<Record *> &Records) {
+  OS << "// StrAttr classes\n";
+  for (const auto *R : Records) {
+    OS << "struct " << R->getName() << "Attr : StrAttr {\n";
     OS << "  static StringRef getKind() {\n";
     OS << "    return \"" << R->getValueAsString("AttrString") << "\";\n";
     OS << "  }\n";

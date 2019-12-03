@@ -10,6 +10,9 @@ class EnumAttr<string S> : Attr<S>;
 /// StringBool attribute.
 class StrBoolAttr<string S> : Attr<S>;
 
+/// StringBool attribute.
+class StrAttr<string S> : Attr<S>;
+
 /// Target-independent enum attributes.
 
 /// Alignment of parameter (5 bits) stored as log2 of alignment with +1 bias.
@@ -262,3 +265,5 @@ def : MergeRule<"adjustCallerStackProbes">;
 def : MergeRule<"adjustCallerStackProbeSize">;
 def : MergeRule<"adjustMinLegalVectorWidth">;
 def : MergeRule<"adjustNullPointerValidAttr">;
+
+def Enclave : StrAttr<"enclave">;
