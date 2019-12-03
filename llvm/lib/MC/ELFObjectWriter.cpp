@@ -1184,13 +1184,15 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
   Asm.PartitionEnclaves.push_back(
     std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const*>
-      ("low", {"sensor", "network"}, nullptr));
+      ("alpha", {"sensor", "network"}, nullptr));
   Asm.PartitionRequirements.push_back(
     std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const*>
-      ("high", {}, nullptr));
+      ("alpha", {"network"}, nullptr));
 
   std::unordered_map<std::string, size_t> capability_ids;
+  std::unordered_map<std::string, size_t> enclave_ids;
   StringTableBuilder capstrtab(StringTableBuilder::Kind::ELF, 1);
+
   MCSectionELF *CapabilitiesSection = nullptr;
   if (!Asm.PartitionCapabilities.empty()) {
     CapabilitiesSection = Ctx.getELFSection(".gaps.capabilities",
@@ -1213,6 +1215,13 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
                                          ELF::SHT_LLVM_PART_ENTR,
                                          0, 16, ""); // XXX: Fix length
     SectionIndexMap[EnclavesSection] = addToSectionTable(EnclavesSection);
+
+    size_t i = 0;
+    for (auto const& entry : Asm.PartitionEnclaves) {
+      std::string name = std::get<0>(entry);
+      enclave_ids[name] = ++i;
+      capstrtab.add(name);
+    }
   }
 
   MCSectionELF *RequirementsSection = nullptr;
@@ -1330,8 +1339,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
       MCSymbol const* symbol = std::get<2>(entry);
 
       W.write<uint64_t>(symbol ? symbol->getIndex() : 0);
-
-      W.write<uint64_t>(capability_ids[name.str()]);
+      W.write<uint64_t>(capstrtab.getOffset(name));
 
       if (attrs.empty()) {
         W.write<uint64_t>(0);
@@ -1359,8 +1367,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
       MCSymbol const* symbol = std::get<2>(entry);
 
       W.write<uint64_t>(symbol ? symbol->getIndex() : 0);
-
-      W.write<uint64_t>(capability_ids[name.str()]);
+      W.write<uint64_t>(enclave_ids[name.str()]);
 
       if (attrs.empty()) {
         W.write<uint64_t>(0);
