@@ -1758,7 +1758,7 @@ void processGapsEnclave() {
         enclave = enclave ? enclave : new Enclave(config->enclave);
 
         if (enclave->entrypoint && e->enc_entry)
-          fatal("Multiple entrypoints specified for enclave " + enclave->name);
+          error("Multiple entrypoints specified for enclave " + enclave->name);
         else
           enclave->entrypoint = &f->getSymbol(e->enc_entry);
 
@@ -1782,7 +1782,9 @@ void processGapsRequirements() {
     for (auto r = f->gaps.symreqs.begin(); r < f->gaps.symreqs.end(); ++r) {
       std::vector<StringRef> caps;
       f->gaps.getRequiredCaps(r->req_cap, caps);
-      const char *enclaveName = r->req_enc ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data() : nullptr;
+      const char *enclaveName = r->req_enc
+          ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data()
+          : nullptr;
       Symbol *symbol = &f->getSymbol(r->req_sym);
 
       requirements.emplace_back(caps, enclaveName, symbol);
@@ -1792,9 +1794,9 @@ void processGapsRequirements() {
 
 void addGapsMain() {
   if (!enclave)
-    fatal("No enclave named " + config->enclave + " defined");
+    error("No enclave named " + config->enclave + " defined");
   if (!enclave->entrypoint)
-    fatal("No entrypoint for " + config->enclave);
+    error("No entrypoint for " + config->enclave);
   if (!enclave->entrypoint->getName().equals("main")) {
     auto sym = reinterpret_cast<Symbol *>(make<SymbolUnion>());
     sym->replace(*enclave->entrypoint);
@@ -1804,59 +1806,24 @@ void addGapsMain() {
 }
 
 void checkGapsRequirements() {
-  auto reqEnd = std::remove_if(requirements.begin(), requirements.end(), [](auto &r) {
+  for (const auto &r : requirements) {
     auto *d = dyn_cast_or_null<Defined>(r.symbol);
     if (!d || !d->section->isLive())
-      return true;
-    warn("<><><> Section for symbol " + d->getName() + " is live");
+      continue;
 
-    if (r.enclave && enclave->name == r.enclave)
-      r.enclave = nullptr;
+    if (r.enclave && enclave->name != r.enclave)
+      error("Symbol " + r.symbol->getName() + " needed, but can be linked on enclave "
+          + StringRef(r.enclave) + " only");
 
-    auto &caps = r.capabilities;
-    auto capEnd = std::remove_if(caps.begin(), caps.end(), [](const auto &needCap) {
-      for (const auto &haveCap : enclave->capabilities) {
-        if (needCap.equals(haveCap)) {
-          warn("<><><> Cap " + needCap + " equals present cap " + haveCap + "; removing");
-          return true;
-        }
-        warn("<><><> Cap " + needCap + " does not equal present cap " + haveCap);
-      }
-      return false;
-    });
-    while (caps.end() != capEnd)
-      caps.pop_back();
-
-    if (caps.empty())
-      warn("<><><> Symbol " + d->getName() + " has no unmet requirements; removing");
-    else
-      warn("<><><> Symbol " + d->getName() + " has unmet requirements");
-    return caps.empty() && !r.enclave;
-  });
-  while (requirements.end() != reqEnd)
-    requirements.pop_back();
-
-  if (!requirements.empty()) {
-    std::string err;
-
-    for (const auto &r : requirements) {
-      std::string line;
-
-      if (r.enclave) {
-        line += "enclave ";
-        line += r.enclave;
-      }
-
-      for (const auto &c : r.capabilities) {
-        if (line.size() > 0)
-          line += ", ";
-        line += c;
-      }
-
-      err += std::string(r.symbol->getName()) + ": " + line + "\n";
+    for (const auto &needCap : r.capabilities) {
+      bool met = false;
+      for (const auto &haveCap : enclave->capabilities)
+        if (needCap.equals(haveCap))
+          met = true;
+      if (!met)
+        error("Symbol " + r.symbol->getName() + " needed, but has unmet requirement "
+            + needCap);
     }
-
-    fatal("The following symbols have unsatisfied GAPS requirements:\n" + err);
   }
 }
 
@@ -2123,17 +2090,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   markLive<ELFT>();
   demoteSharedSymbols();
   checkGapsRequirements();
-
-  // <><><>
-  if (enclave) {
-    for (const auto &r : requirements) {
-      warn("Unmet: Symbol " + r.symbol->getName() + " requires " +
-        (r.enclave ? "enclave " + StringRef(r.enclave) : StringRef("no enclave")) +
-        " and the following capabilities:");
-      for (const auto &c : r.capabilities)
-        warn("\t" + c);
-    }
-  }
 
   // Make copies of any input sections that need to be copied into each
   // partition.
