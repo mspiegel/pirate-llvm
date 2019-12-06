@@ -129,6 +129,7 @@
 #include <utility>
 #include <vector>
 #include <unordered_map>
+#include <iostream>
 
 using namespace llvm;
 
@@ -1395,6 +1396,17 @@ void AsmPrinter::emitGapsSections(Module &M) {
       PartitionEnclaves;
   std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>>
       PartitionRequirements;
+
+  for (auto const& f : M) {
+    OutStreamer->EmitSymbol
+    if (f.hasFnAttribute("enclave")) {
+      PartitionRequirements.push_back(
+        std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const *>(
+        f.getFnAttribute("enclave").getValueAsString(),
+        {},
+        nullptr));
+    }
+  }
 
   // XXX: Test data
   PartitionCapabilities.push_back(std::make_pair(std::string("low"), ""));
