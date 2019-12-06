@@ -212,10 +212,6 @@ private:
 public:
   std::vector<std::pair<StringRef, const MCSymbol *>> Symvers;
 
-  std::vector<std::pair<StringRef, StringRef>> PartitionCapabilities; // Capability/Sensitivity, parent
-  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>> PartitionEnclaves;
-  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>> PartitionRequirements;
-
   /// Construct a new assembler instance.
   //
   // FIXME: How are we going to parameterize this? Two obvious options are stay

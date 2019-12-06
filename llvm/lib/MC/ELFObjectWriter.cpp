@@ -59,7 +59,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <unordered_map>
 
 using namespace llvm;
 
@@ -1176,76 +1175,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     SectionIndexMap[CGProfileSection] = addToSectionTable(CGProfileSection);
   }
 
-  // XXX: Test data
-  Asm.PartitionCapabilities.push_back(std::make_pair(std::string("low"), ""));
-  Asm.PartitionCapabilities.push_back(std::make_pair(std::string("high"), "low"));
-  Asm.PartitionCapabilities.push_back(std::make_pair(std::string("sensor"), ""));
-  Asm.PartitionCapabilities.push_back(std::make_pair(std::string("network"), ""));
 
-  Asm.PartitionEnclaves.push_back(
-    std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const*>
-      ("alpha", {"sensor", "network"}, nullptr));
-  Asm.PartitionRequirements.push_back(
-    std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const*>
-      ("alpha", {"network"}, nullptr));
-
-  std::unordered_map<std::string, size_t> capability_ids;
-  std::unordered_map<std::string, size_t> enclave_ids;
-  StringTableBuilder capstrtab(StringTableBuilder::Kind::ELF, 1);
-
-  MCSectionELF *CapabilitiesSection = nullptr;
-  if (!Asm.PartitionCapabilities.empty()) {
-    CapabilitiesSection = Ctx.getELFSection(".gaps.capabilities",
-                                         ELF::SHT_LLVM_PART_CAPS,
-                                         0, 16, "");
-    SectionIndexMap[CapabilitiesSection] = addToSectionTable(CapabilitiesSection);
-
-    size_t i = 0;
-    for (auto const& entry : Asm.PartitionCapabilities) {
-      std::string name = entry.first.str();
-      capability_ids[name] = ++i;
-      capstrtab.add(entry.first);
-    }
-  }
-  capstrtab.finalize();
-
-  MCSectionELF *EnclavesSection = nullptr;
-  if (!Asm.PartitionEnclaves.empty()) {
-    EnclavesSection = Ctx.getELFSection(".gaps.enclaves",
-                                         ELF::SHT_LLVM_PART_ENTR,
-                                         0, 16, ""); // XXX: Fix length
-    SectionIndexMap[EnclavesSection] = addToSectionTable(EnclavesSection);
-
-    size_t i = 0;
-    for (auto const& entry : Asm.PartitionEnclaves) {
-      std::string name = std::get<0>(entry);
-      enclave_ids[name] = ++i;
-      capstrtab.add(name);
-    }
-  }
-
-  MCSectionELF *RequirementsSection = nullptr;
-  if (!Asm.PartitionRequirements.empty()) {
-    RequirementsSection = Ctx.getELFSection(".gaps.symreqs",
-                                         ELF::SHT_LLVM_PART_REQS,
-                                         0, 24, "");
-    SectionIndexMap[RequirementsSection] = addToSectionTable(RequirementsSection);
-  }
-
-  MCSectionELF *CapsTabSection = nullptr;
-  std::vector<uint64_t> capstab { 0 };
-  if (!Asm.PartitionRequirements.empty() || !Asm.PartitionEnclaves.empty()) {
-    CapsTabSection = Ctx.getELFSection(".gaps.captab",
-                                         ELF::SHT_LLVM_PART_CAPSTAB,
-                                         0, 8, "");
-    SectionIndexMap[CapsTabSection] = addToSectionTable(CapsTabSection);
-  }
-
-  MCSectionELF *CapStrTabSection = nullptr;
-  if (!Asm.PartitionCapabilities.empty()) {
-    CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_LLVM_PART_STRTAB, 0);
-    SectionIndexMap[CapStrTabSection] = addToSectionTable(CapStrTabSection);
-  }
 
   for (MCSectionELF *Group : Groups) {
     align(Group->getAlignment());
@@ -1313,102 +1243,12 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     SectionOffsets[CGProfileSection] = std::make_pair(SecStart, SecEnd);
   }
 
-  if (CapabilitiesSection) {
-    uint64_t SecStart = W.OS.tell();
-
-    // first entry is used for the absense of capabilities
-    W.write<uint64_t>(0);
-    W.write<uint64_t>(0);
-
-    for (std::pair<StringRef, StringRef> const& entry : Asm.PartitionCapabilities) {
-      W.write<uint64_t>(capstrtab.getOffset(entry.first));
-      W.write<uint64_t>(entry.second.empty() ? 0 : capability_ids[entry.second]);
-    }
-
-    uint64_t SecEnd = W.OS.tell();
-    SectionOffsets[CapabilitiesSection] = std::make_pair(SecStart, SecEnd);
-  }
-
-  if (EnclavesSection) {
-    uint64_t SecStart = W.OS.tell();
-
-    for (auto const &entry : Asm.PartitionEnclaves) {
-      
-      StringRef name = std::get<0>(entry);
-      std::vector<StringRef> const& attrs = std::get<1>(entry);
-      MCSymbol const* symbol = std::get<2>(entry);
-
-      W.write<uint64_t>(symbol ? symbol->getIndex() : 0);
-      W.write<uint64_t>(capstrtab.getOffset(name));
-
-      if (attrs.empty()) {
-        W.write<uint64_t>(0);
-      } else {
-        W.write<uint64_t>(capstab.size());
-
-        for (auto i : attrs) {
-          capstab.push_back(capability_ids[i.str()]);
-        }
-        capstab.push_back(0); // list terminator
-      }
-    }
-    
-    uint64_t SecEnd = W.OS.tell();
-    SectionOffsets[EnclavesSection] = std::make_pair(SecStart, SecEnd);
-  }
-
-  if (RequirementsSection) {
-    uint64_t SecStart = W.OS.tell();
-
-    for (auto const &entry : Asm.PartitionRequirements) {
-      
-      StringRef name = std::get<0>(entry);
-      std::vector<StringRef> const& attrs = std::get<1>(entry);
-      MCSymbol const* symbol = std::get<2>(entry);
-
-      W.write<uint64_t>(symbol ? symbol->getIndex() : 0);
-      W.write<uint64_t>(enclave_ids[name.str()]);
-
-      if (attrs.empty()) {
-        W.write<uint64_t>(0);
-      } else {
-        W.write<uint64_t>(capstab.size());
-
-        for (auto i : attrs) {
-          capstab.push_back(capability_ids[i.str()]);
-        }
-        capstab.push_back(0); // list terminator
-      }
-    }
-    
-    uint64_t SecEnd = W.OS.tell();
-    SectionOffsets[RequirementsSection] = std::make_pair(SecStart, SecEnd);
-  }
-
-  if (CapsTabSection) {
-    uint64_t SecStart = W.OS.tell();
-
-    for (auto entry : capstab) {
-      W.write<uint64_t>(entry);
-    }
-    
-    uint64_t SecEnd = W.OS.tell();
-    SectionOffsets[CapsTabSection] = std::make_pair(SecStart, SecEnd);
-  }
-
-  {
-    uint64_t SecStart = W.OS.tell();
-    capstrtab.write(W.OS);
-    uint64_t SecEnd = W.OS.tell();
-    SectionOffsets[CapStrTabSection] = std::make_pair(SecStart, SecEnd);
-  }
-
   {
     uint64_t SecStart = W.OS.tell();
     const MCSectionELF *Sec = createStringTable(Ctx);
     uint64_t SecEnd = W.OS.tell();
     SectionOffsets[Sec] = std::make_pair(SecStart, SecEnd);
-  }
+ }
 
   uint64_t NaturalAlignment = is64Bit() ? 8 : 4;
   align(NaturalAlignment);

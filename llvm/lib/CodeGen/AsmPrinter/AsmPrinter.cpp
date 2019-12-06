@@ -100,6 +100,7 @@
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/MC/MCValue.h"
 #include "llvm/MC/SectionKind.h"
+#include "llvm/MC/StringTableBuilder.h"
 #include "llvm/Pass.h"
 #include "llvm/Remarks/Remark.h"
 #include "llvm/Remarks/RemarkFormat.h"
@@ -127,6 +128,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <unordered_map>
 
 using namespace llvm;
 
@@ -1385,6 +1387,130 @@ void AsmPrinter::emitRemarksSection(Module &M) {
   OutStreamer->EmitBinaryData(OS.str());
 }
 
+void AsmPrinter::emitGapsSections(Module &M) {
+
+  std::vector<std::pair<StringRef, StringRef>>
+      PartitionCapabilities; // Capability/Sensitivity, parent
+  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>>
+      PartitionEnclaves;
+  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>>
+      PartitionRequirements;
+
+  // XXX: Test data
+  PartitionCapabilities.push_back(std::make_pair(std::string("low"), ""));
+  PartitionCapabilities.push_back(std::make_pair(std::string("high"), "low"));
+  PartitionCapabilities.push_back(std::make_pair(std::string("sensor"), ""));
+  PartitionCapabilities.push_back(std::make_pair(std::string("network"), ""));
+  PartitionEnclaves.push_back(
+      std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const *>(
+          "alpha", {"sensor", "network"}, nullptr));
+  PartitionRequirements.push_back(
+      std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const *>(
+          "alpha", {"network"}, nullptr));
+
+  std::vector<uint64_t> capstab{0};
+  std::unordered_map<std::string, size_t> capability_ids;
+  std::unordered_map<std::string, size_t> enclave_ids;
+  StringTableBuilder capstrtab(StringTableBuilder::Kind::ELF, 1);
+  {
+    size_t i = 0;
+    for (auto const &entry : PartitionCapabilities) {
+      std::string name = entry.first.str();
+      capability_ids[name] = ++i;
+      capstrtab.add(entry.first);
+    }
+    i = 0;
+    for (auto const &entry : PartitionEnclaves) {
+      std::string name = std::get<0>(entry);
+      enclave_ids[name] = ++i;
+      capstrtab.add(name);
+    }
+  }
+  capstrtab.finalize();
+
+  if (!PartitionCapabilities.empty()) {
+    OutStreamer->SwitchSection(OutContext.getELFSection(
+        ".gaps.capabilities", ELF::SHT_LLVM_PART_CAPS, 0, 16, ""));
+
+    // first entry is used for the absense of capabilities
+    emitInt64(0);
+    emitInt64(0);
+
+    for (std::pair<StringRef, StringRef> const &entry : PartitionCapabilities) {
+      emitInt64(capstrtab.getOffset(entry.first));
+      emitInt64(entry.second.empty() ? 0 : capability_ids[entry.second]);
+    }
+  }
+
+  if (!PartitionEnclaves.empty()) {
+    OutStreamer->SwitchSection(
+        OutContext.getELFSection(".gaps.enclaves", ELF::SHT_LLVM_PART_ENTR, 0,
+                                 16, "")); // XXX: Fix length
+
+    for (auto const &entry : PartitionEnclaves) {
+
+      StringRef name = std::get<0>(entry);
+      std::vector<StringRef> const &attrs = std::get<1>(entry);
+      MCSymbol const *symbol = std::get<2>(entry);
+
+      emitInt64(symbol ? symbol->getIndex() : 0);
+      emitInt64(capstrtab.getOffset(name));
+
+      if (attrs.empty()) {
+        emitInt64(0);
+      } else {
+        emitInt64(capstab.size());
+
+        for (auto i : attrs) {
+          capstab.push_back(capability_ids[i.str()]);
+        }
+        capstab.push_back(0); // list terminator
+      }
+    }
+  }
+
+  if (!PartitionRequirements.empty()) {
+    OutStreamer->SwitchSection(OutContext.getELFSection(
+        ".gaps.symreqs", ELF::SHT_LLVM_PART_REQS, 0, 24, ""));
+    for (auto const &entry : PartitionRequirements) {
+
+      StringRef name = std::get<0>(entry);
+      std::vector<StringRef> const &attrs = std::get<1>(entry);
+      MCSymbol const *symbol = std::get<2>(entry);
+
+      emitInt64(symbol ? symbol->getIndex() : 0);
+      emitInt64(enclave_ids[name.str()]);
+
+      if (attrs.empty()) {
+        emitInt64(0);
+      } else {
+        emitInt64(capstab.size());
+
+        for (auto i : attrs) {
+          capstab.push_back(capability_ids[i.str()]);
+        }
+        capstab.push_back(0); // list terminator
+      }
+    }
+  }
+
+  if (capstab.size() > 1) {
+    OutStreamer->SwitchSection(OutContext.getELFSection(
+        ".gaps.captab", ELF::SHT_LLVM_PART_CAPSTAB, 0, 8, ""));
+    for (auto entry : capstab) {
+      emitInt64(entry);
+    }
+  }
+
+  OutStreamer->SwitchSection(
+      OutContext.getELFSection(".gaps.strtab", ELF::SHT_LLVM_PART_STRTAB, 0));
+
+  std::string capstr_out;
+  raw_string_ostream os(capstr_out);
+  capstrtab.write(os);
+  OutStreamer->EmitBytes(os.str());
+}
+
 bool AsmPrinter::doFinalization(Module &M) {
   // Set the MachineFunction to nullptr so that we can catch attempted
   // accesses to MF specific features at the module level and so that
@@ -1635,6 +1761,8 @@ bool AsmPrinter::doFinalization(Module &M) {
           MAI->getCodePointerSize());
     }
   }
+
+  emitGapsSections(M);
 
   // Allow the target to emit any magic that it wants at the end of the file,
   // after everything else has gone out.
