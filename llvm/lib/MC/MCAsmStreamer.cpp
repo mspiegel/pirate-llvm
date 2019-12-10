@@ -329,6 +329,10 @@ public:
   void emitCGProfileEntry(const MCSymbolRefExpr *From,
                           const MCSymbolRefExpr *To, uint64_t Count) override;
 
+  void emitEnclaveEntry(const MCSymbol *sym, StringRef name, std::vector<StringRef> attrs) override;
+  void emitEnclaveRequirement(const MCSymbol *sym, StringRef name, std::vector<StringRef> attrs) override;
+  void emitCapability(StringRef cap, StringRef parent) override;
+
   void EmitInstruction(const MCInst &Inst, const MCSubtargetInfo &STI) override;
 
   void EmitBundleAlignMode(unsigned AlignPow2) override;
@@ -1832,6 +1836,30 @@ void MCAsmStreamer::emitCGProfileEntry(const MCSymbolRefExpr *From,
   To->getSymbol().print(OS, MAI);
   OS << ", " << Count;
   EmitEOL();
+}
+
+void MCAsmStreamer::emitEnclaveEntry(MCSymbol const* sym, StringRef name, std::vector<StringRef> attrs) {
+  Assembler->PartitionEnclaves.push_back(
+    std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const *>(
+      std::move(name), 
+      std::move(attrs),
+      std::move(sym)
+    ));
+}
+
+void MCAsmStreamer::emitEnclaveRequirement(const MCSymbol *sym, StringRef name, std::vector<StringRef> attrs) {
+    Assembler->PartitionRequirements.push_back(
+    std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const *>(
+      std::move(name), 
+      std::move(attrs),
+      std::move(sym)
+    ));
+}
+void MCAsmStreamer::emitCapability(StringRef cap, StringRef parent) {
+    Assembler->PartitionCapabilities.push_back(
+    std::make_pair<StringRef, StringRef>(
+      std::move(cap), std::move(parent)
+    ));
 }
 
 void MCAsmStreamer::AddEncodingComment(const MCInst &Inst,

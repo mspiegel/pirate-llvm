@@ -729,3 +729,28 @@ void MCObjectStreamer::FinishImpl() {
   resolvePendingFixups();
   getAssembler().Finish();
 }
+
+void MCObjectStreamer::emitEnclaveEntry(MCSymbol const* sym, StringRef name, std::vector<StringRef> attrs) {
+  Assembler->PartitionEnclaves.push_back(
+    std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const *>(
+      std::move(name), 
+      std::move(attrs),
+      std::move(sym)
+    ));
+}
+
+void MCObjectStreamer::emitEnclaveRequirement(const MCSymbol *sym, StringRef name, std::vector<StringRef> attrs) {
+    Assembler->PartitionRequirements.push_back(
+    std::make_tuple<StringRef, std::vector<StringRef>, MCSymbol const *>(
+      std::move(name), 
+      std::move(attrs),
+      std::move(sym)
+    ));
+}
+
+void MCObjectStreamer::emitCapability(StringRef cap, StringRef parent) {
+    Assembler->PartitionCapabilities.push_back(
+    std::make_pair<StringRef, StringRef>(
+      std::move(cap), std::move(parent)
+    ));
+}

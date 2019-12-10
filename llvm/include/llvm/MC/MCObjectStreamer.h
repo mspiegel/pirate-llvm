@@ -96,6 +96,10 @@ protected:
   void flushPendingLabels(MCFragment *F, uint64_t FOffset = 0);
 
 public:
+  void emitEnclaveEntry(const MCSymbol *sym, StringRef name, std::vector<StringRef> attrs) override;
+  void emitEnclaveRequirement(const MCSymbol *sym, StringRef name, std::vector<StringRef> attrs) override;
+  void emitCapability(StringRef cap, StringRef parent) override;
+
   void visitUsedSymbol(const MCSymbol &Sym) override;
 
   /// Create a dummy fragment to assign any pending labels.

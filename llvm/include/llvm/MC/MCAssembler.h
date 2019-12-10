@@ -210,6 +210,14 @@ private:
   handleFixup(const MCAsmLayout &Layout, MCFragment &F, const MCFixup &Fixup);
 
 public:
+
+  std::vector<std::pair<StringRef, StringRef>>
+      PartitionCapabilities; // Capability/Sensitivity, parent
+  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>>
+      PartitionEnclaves;
+  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>>
+      PartitionRequirements;
+
   std::vector<std::pair<StringRef, const MCSymbol *>> Symvers;
 
   /// Construct a new assembler instance.
