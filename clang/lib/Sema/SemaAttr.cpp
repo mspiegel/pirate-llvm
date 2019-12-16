@@ -990,3 +990,11 @@ void Sema::PopPragmaVisibility(bool IsNamespaceEnd, SourceLocation EndLoc) {
   if (Stack->empty())
     FreeVisContext();
 }
+
+void Sema::ActOnPragmaDeclareEnclave(StringRef Name)
+{
+}
+
+void Sema::ActOnPragmaDeclareSensitivity(StringRef Name, StringRef Parent)
+{
+}

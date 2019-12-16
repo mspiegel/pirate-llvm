@@ -1311,7 +1311,8 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
     for (std::pair<StringRef, StringRef> const& entry : Asm.PartitionCapabilities) {
       W.write<uint64_t>(capstrtab.getOffset(entry.first));
-      W.write<uint64_t>(entry.second.empty() ? 0 : capability_ids[entry.second]);
+      W.write<uint32_t>(entry.second.empty() ? 0 : capability_ids[entry.second]);
+      W.write<uint32_t>(0);
     }
 
     uint64_t SecEnd = W.OS.tell();
@@ -1327,19 +1328,21 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
       std::vector<StringRef> const& attrs = std::get<1>(entry);
       MCSymbol const* symbol = std::get<2>(entry);
 
-      W.write<uint64_t>(symbol ? symbol->getIndex() : 0);
-      W.write<uint64_t>(capstrtab.getOffset(name));
+      W.write<uint64_t>(capstrtab.getOffset(name)); // .enc_name
 
       if (attrs.empty()) {
-        W.write<uint64_t>(0);
+        W.write<uint32_t>(0); // .enc_cap
       } else {
-        W.write<uint64_t>(capstab.size());
+        W.write<uint32_t>(capstab.size()); // .enc_cap
 
         for (auto i : attrs) {
           capstab.push_back(capability_ids[i.str()]);
         }
         capstab.push_back(0); // list terminator
       }
+
+      W.write<uint16_t>(symbol ? symbol->getIndex() : 0); // .enc_entry
+      W.write<uint16_t>(0);
     }
     
     uint64_t SecEnd = W.OS.tell();
@@ -1355,19 +1358,21 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
       std::vector<StringRef> const& attrs = std::get<1>(entry);
       MCSymbol const* symbol = std::get<2>(entry);
 
-      W.write<uint64_t>(symbol ? symbol->getIndex() : 0);
-      W.write<uint64_t>(enclave_ids[name.str()]);
-
       if (attrs.empty()) {
-        W.write<uint64_t>(0);
+        W.write<uint32_t>(0); // req_cap
       } else {
-        W.write<uint64_t>(capstab.size());
+        W.write<uint32_t>(capstab.size()); // req_cap
 
         for (auto i : attrs) {
           capstab.push_back(capability_ids[i.str()]);
         }
         capstab.push_back(0); // list terminator
       }
+
+      W.write<uint32_t>(capability_ids[name.str()]); // req_enc
+
+      W.write<uint16_t>(symbol ? symbol->getIndex() : 0); // req_sym
+      W.write<uint16_t>(0); // req_padding
     }
     
     uint64_t SecEnd = W.OS.tell();
@@ -1378,7 +1383,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     uint64_t SecStart = W.OS.tell();
 
     for (auto entry : capstab) {
-      W.write<uint64_t>(entry);
+      W.write<uint32_t>(entry);
     }
     
     uint64_t SecEnd = W.OS.tell();

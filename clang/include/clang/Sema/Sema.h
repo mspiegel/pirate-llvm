@@ -8716,6 +8716,9 @@ public:
     POAK_Reset    // #pragma options align=reset
   };
 
+  void ActOnPragmaDeclareEnclave(StringRef enclave);
+  void ActOnPragmaDeclareSensitivity(StringRef sensitivity, StringRef parent);
+
   /// ActOnPragmaClangSection - Called on well formed \#pragma clang section
   void ActOnPragmaClangSection(SourceLocation PragmaLoc,
                                PragmaClangSectionAction Action,
