@@ -1483,9 +1483,14 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
                                                            llvm::Function *F) {
   llvm::AttrBuilder B;
   
-  if (F->hasFnAttribute("enclave")) {
-    auto attr = F->getFnAttribute("enclave");
-    B.addAttribute("enclave", attr.getValueAsString()); // XXX Eric: Find actual attribute value
+  if (F->hasFnAttribute("enclave_only")) {
+    auto attr = F->getFnAttribute("enclave_only");
+    B.addAttribute("enclave_only", attr.getValueAsString());
+  }
+
+  if (F->hasFnAttribute("enclave_main")) {
+    auto attr = F->getFnAttribute("enclave_main");
+    B.addAttribute("enclave_main", attr.getValueAsString());
   }
 
   if (CodeGenOpts.UnwindTables)
