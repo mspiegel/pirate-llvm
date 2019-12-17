@@ -3409,9 +3409,16 @@ def ObjCExternallyRetained : InheritableAttr {
   let Documentation = [ObjCExternallyRetainedDocs];
 }
 
-def Enclave : InheritableAttr {
-  let Spellings = [Clang<"enclave">];
+def EnclaveOnly : InheritableAttr {
+  let Spellings = [Clang<"enclave_only">];
   let Subjects = SubjectList<[Function, GlobalVar]>;
-  let Documentation = [EnclaveDocs];
+  let Documentation = [EnclaveOnlyDocs];
+  let Args = [StringArgument<"EnclaveName">];
+}
+
+def EnclaveMain : InheritableAttr {
+  let Spellings = [Clang<"enclave_main">];
+  let Subjects = SubjectList<[Function, GlobalVar]>;
+  let Documentation = [EnclaveMainDocs];
   let Args = [StringArgument<"EnclaveName">];
 }

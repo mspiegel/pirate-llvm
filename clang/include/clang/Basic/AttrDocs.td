@@ -4392,9 +4392,17 @@ When the Owner's lifetime ends, it will consider the Pointer to be dangling.
 }];
 }
 
-def EnclaveDocs : Documentation {
+def EnclaveMainDocs : Documentation {
   let Category = DocCatFunction;
-  let Heading = "enclave";
+  let Heading = "enclave_main";
+  let Content = [{
+  Mark the entry point for an enclave.
+  }];
+}
+
+def EnclaveOnlyDocs : Documentation {
+  let Category = DocCatFunction;
+  let Heading = "enclave_only";
   let Content = [{
   Mark a declaration that only appears in a particular enclave.
   }];

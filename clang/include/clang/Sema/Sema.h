@@ -8717,7 +8717,9 @@ public:
   };
 
   void ActOnPragmaDeclareEnclave(StringRef enclave);
-  void ActOnPragmaDeclareSensitivity(StringRef sensitivity, StringRef parent);
+  void ActOnPragmaDeclareEnclaveCapability(StringRef enclave, StringRef capability);
+  void ActOnPragmaDeclareCapability(StringRef sensitivity);
+  void ActOnPragmaDeclareCapability(StringRef sensitivity, StringRef parent);
 
   /// ActOnPragmaClangSection - Called on well formed \#pragma clang section
   void ActOnPragmaClangSection(SourceLocation PragmaLoc,

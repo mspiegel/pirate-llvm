@@ -263,9 +263,9 @@ struct PragmaAttributeHandler : public PragmaHandler {
   ParsedAttributes AttributesForPragmaAttribute;
 };
 
-struct PragmaSensitivityHandler : public PragmaHandler {
+struct PragmaCapabilityHandler : public PragmaHandler {
   Sema &Actions;
-  PragmaSensitivityHandler(Sema& Actions) : PragmaHandler("sensitivity"), Actions(Actions) {}
+  PragmaCapabilityHandler(Sema& Actions) : PragmaHandler("capability"), Actions(Actions) {}
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
                     Token &FirstToken) override;
 };
@@ -398,7 +398,7 @@ void Parser::initializePragmaHandlers() {
       std::make_unique<PragmaAttributeHandler>(AttrFactory);
   PP.AddPragmaHandler("clang", AttributePragmaHandler.get());
 
-  SensitivityPragmaHandler = std::make_unique<PragmaSensitivityHandler>(Actions);
+  SensitivityPragmaHandler = std::make_unique<PragmaCapabilityHandler>(Actions);
   PP.AddPragmaHandler(SensitivityPragmaHandler.get());
 
   EnclavePragmaHandler = std::make_unique<PragmaEnclaveHandler>(Actions);
@@ -3305,7 +3305,7 @@ void PragmaAttributeHandler::HandlePragma(Preprocessor &PP,
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
 }
 
-void PragmaSensitivityHandler::HandlePragma(
+void PragmaCapabilityHandler::HandlePragma(
   Preprocessor &PP,
   PragmaIntroducer Introducer,
   Token &Tok)
@@ -3318,15 +3318,13 @@ void PragmaSensitivityHandler::HandlePragma(
   if (Tok.isAnyIdentifier()) {
     command = Tok.getIdentifierInfo()->getName();
   } else {
-    PP.Diag(Tok,
-              diag::warn_pragma_expected_sensitivity_comand)
-          << "sensitivity";
+    PP.Diag(Tok, diag::warn_pragma_capability);
     return;
   }
 
   PP.Lex(Tok);
   if (Tok.isNot(tok::l_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+    PP.Diag(PragmaLoc, diag::warn_pragma_capability);
     return;
   }
   
@@ -3340,41 +3338,34 @@ void PragmaSensitivityHandler::HandlePragma(
       if (Tok.is(tok::comma)) {
         PP.Lex(Tok);
         if (!Tok.isAnyIdentifier()) {
-          PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+          PP.Diag(PragmaLoc, diag::warn_pragma_capability);
           return;
         }
       } else if (Tok.is(tok::r_paren)) {
         break;
       } else {
-        PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+        PP.Diag(PragmaLoc, diag::warn_pragma_capability);
         return;
       }
     }
 
   } else if (Tok.isNot(tok::r_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+    PP.Diag(PragmaLoc, diag::warn_pragma_capability);
     return;
   }
 
   PP.Lex(Tok);
   if (Tok.isNot(tok::eod)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol)
-        << "sensitivity";
+    PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "capability";
     return;
   }
 
-  if (command == "declare") {
-    if (args.size() == 1) {
-      Actions.ActOnPragmaDeclareSensitivity(args[0], "");
-    } else if (args.size() == 2) {
-      Actions.ActOnPragmaDeclareSensitivity(args[0], args[1]);
-    } else {
-      PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
-      return;
-    }
+  if (command == "declare" && args.size() == 1) {
+    Actions.ActOnPragmaDeclareCapability(args[0]);
+  } else if (command == "declare" && args.size() == 2) {
+    Actions.ActOnPragmaDeclareCapability(args[0], args[1]);
   } else {
-    PP.Diag(Tok, diag::warn_pragma_expected_sensitivity_comand)
-          << "sensitivity";
+    PP.Diag(PragmaLoc, diag::warn_pragma_capability);
     return;
   }
 
@@ -3386,7 +3377,7 @@ void PragmaEnclaveHandler::HandlePragma(
   PragmaIntroducer Introducer,
   Token &Tok)
 {
-    SourceLocation PragmaLoc = Tok.getLocation();
+  SourceLocation PragmaLoc = Tok.getLocation();
   StringRef command;
   std::vector<StringRef> args;
 
@@ -3394,15 +3385,13 @@ void PragmaEnclaveHandler::HandlePragma(
   if (Tok.isAnyIdentifier()) {
     command = Tok.getIdentifierInfo()->getName();
   } else {
-    PP.Diag(Tok,
-              diag::warn_pragma_expected_sensitivity_comand)
-          << "enclave";
+    PP.Diag(Tok, diag::warn_pragma_enclave);
     return;
   }
 
   PP.Lex(Tok);
   if (Tok.isNot(tok::l_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+    PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
     return;
   }
   
@@ -3416,39 +3405,34 @@ void PragmaEnclaveHandler::HandlePragma(
       if (Tok.is(tok::comma)) {
         PP.Lex(Tok);
         if (!Tok.isAnyIdentifier()) {
-          PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+          PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
           return;
         }
       } else if (Tok.is(tok::r_paren)) {
         break;
       } else {
-        PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+        PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
         return;
       }
     }
 
   } else if (Tok.isNot(tok::r_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
+    PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
     return;
   }
 
   PP.Lex(Tok);
   if (Tok.isNot(tok::eod)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol)
-        << "enclave";
+    PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "enclave";
     return;
   }
 
-  if (command == "declare") {
-    if (args.size() == 1) {
-      Actions.ActOnPragmaDeclareEnclave(args[0]);
-    } else {
-      PP.Diag(PragmaLoc, diag::warn_pragma_sensitivity);
-      return;
-    }
+  if (command == "declare" && args.size() == 1) {
+    Actions.ActOnPragmaDeclareEnclave(args[0]);
+  } else if (command == "capability" && args.size() == 2) {
+    Actions.ActOnPragmaDeclareEnclaveCapability(args[0], args[1]);
   } else {
-    PP.Diag(Tok, diag::warn_pragma_expected_sensitivity_comand)
-          << "enclave";
+    PP.Diag(Tok, diag::warn_pragma_enclave);
     return;
   }
 

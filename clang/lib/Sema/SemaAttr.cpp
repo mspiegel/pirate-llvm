@@ -995,6 +995,14 @@ void Sema::ActOnPragmaDeclareEnclave(StringRef Name)
 {
 }
 
-void Sema::ActOnPragmaDeclareSensitivity(StringRef Name, StringRef Parent)
+void Sema::ActOnPragmaDeclareEnclaveCapability(StringRef enclave, StringRef capability)
+{
+}
+
+void Sema::ActOnPragmaDeclareCapability(StringRef Name)
+{
+}
+
+void Sema::ActOnPragmaDeclareCapability(StringRef Name, StringRef Parent)
 {
 }

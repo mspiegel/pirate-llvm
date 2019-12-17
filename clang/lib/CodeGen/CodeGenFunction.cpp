@@ -1146,8 +1146,12 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
   FunctionArgList Args;
   QualType ResTy = BuildFunctionArgList(GD, Args);
 
-  if (FD->hasAttr<EnclaveAttr>()) {
-    Fn->addFnAttr("enclave",FD->getAttr<EnclaveAttr>()->getEnclaveName());
+  if (FD->hasAttr<EnclaveMainAttr>()) {
+    Fn->addFnAttr("enclave_main",FD->getAttr<EnclaveMainAttr>()->getEnclaveName());
+  }
+
+  if (FD->hasAttr<EnclaveOnlyAttr>()) {
+    Fn->addFnAttr("enclave_only",FD->getAttr<EnclaveOnlyAttr>()->getEnclaveName());
   }
 
   // Check if we should generate debug info for this function.

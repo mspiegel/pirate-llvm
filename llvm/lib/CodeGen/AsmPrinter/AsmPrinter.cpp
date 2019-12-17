@@ -1398,11 +1398,17 @@ void AsmPrinter::emitGapsSections(Module &M) {
       PartitionRequirements;
 
   for (auto const& f : M) {
-
-    if (f.hasFnAttribute("enclave")) {
+    if (f.hasFnAttribute("enclave_only")) {
       OutStreamer->emitEnclaveRequirement(
         getSymbol(&f), 
-        f.getFnAttribute("enclave").getValueAsString(),
+        f.getFnAttribute("enclave_only").getValueAsString(),
+        std::vector<StringRef>()
+      );
+    }
+    if (f.hasFnAttribute("enclave_main")) {
+      OutStreamer->emitEnclaveEntry(
+        getSymbol(&f), 
+        f.getFnAttribute("enclave_main").getValueAsString(),
         std::vector<StringRef>()
       );
     }
