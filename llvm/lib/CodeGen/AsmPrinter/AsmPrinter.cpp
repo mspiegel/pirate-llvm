@@ -1400,7 +1400,7 @@ void AsmPrinter::emitGapsSections(Module &M) {
   for (auto const& f : M) {
     if (f.hasFnAttribute("enclave_only")) {
       OutStreamer->emitEnclaveRequirement(
-        getSymbol(&f), 
+        getSymbol(&f),
         f.getFnAttribute("enclave_only").getValueAsString(),
         std::vector<StringRef>()
       );
@@ -1419,11 +1419,6 @@ void AsmPrinter::emitGapsSections(Module &M) {
   OutStreamer->emitCapability("high", "low");
   OutStreamer->emitCapability("sensor", "");
   OutStreamer->emitCapability("network", "");
-
-  OutStreamer->emitEnclaveEntry(
-    nullptr,
-    "alpha",
-    std::vector<StringRef>{"sensor", "network"});
 }
 
 bool AsmPrinter::doFinalization(Module &M) {
