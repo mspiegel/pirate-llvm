@@ -83,10 +83,9 @@ struct Enclave {
 struct Requirements {
   std::vector<StringRef> capabilities;
   const char *enclave;
-  Symbol *symbol;
 
-  Requirements(std::vector<StringRef> &c, const char *e, Symbol *s)
-    : capabilities(c), enclave(e), symbol(s) {}
+  Requirements(std::vector<StringRef> &c, const char *e)
+    : capabilities(c), enclave(e) {}
 };
 
 } // namespace elf

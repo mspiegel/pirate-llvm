@@ -1787,42 +1787,58 @@ void processGapsRequirements() {
           : nullptr;
       Symbol *symbol = &f->getSymbol(r->req_sym);
 
-      requirements.emplace_back(caps, enclaveName, symbol);
+      requirements.emplace_back(caps, enclaveName);
+      symbol->gapsReqsIdx = requirements.size() - 1;
     }
   }
 }
 
 void addGapsMain() {
-  if (!enclave)
+  if (!enclave) {
     error("No enclave named " + config->enclave + " defined");
-  if (!enclave->entrypoint)
+    return;
+  }
+  if (!enclave->entrypoint) {
     error("No entrypoint for " + config->enclave);
-  if (!enclave->entrypoint->getName().equals("main")) {
-    auto sym = reinterpret_cast<Symbol *>(make<SymbolUnion>());
-    sym->replace(*enclave->entrypoint);
-    sym->setName({"main", 4});
-    symtab->addSymbol(*sym);
+    return;
+  }
+
+  if (Symbol *startSym = symtab->find(config->entry)) {
+    for (Symbol *s : startSym->file->getSymbols()) {
+      if (s->getName().equals("main")) {
+        if (s->isUndefined())
+          s->resolve(*enclave->entrypoint);
+        else
+          s->replace(*enclave->entrypoint);
+      }
+    }
   }
 }
 
 void checkGapsRequirements() {
-  for (const auto &r : requirements) {
-    auto *d = dyn_cast_or_null<Defined>(r.symbol);
-    if (!d || !d->section->isLive())
-      continue;
+  for (InputFile *f : objectFiles) {
+    for (Symbol *s : f->getSymbols()) {
+      if (s->gapsReqsIdx < 0)
+        continue;
+      Requirements &r = requirements[s->gapsReqsIdx];
 
-    if (r.enclave && enclave->name != r.enclave)
-      error("Symbol " + r.symbol->getName() + " needed, but can be linked on enclave "
-          + StringRef(r.enclave) + " only");
+      auto *d = dyn_cast_or_null<Defined>(s);
+      if (!d || !d->section->isLive())
+        continue;
 
-    for (const auto &needCap : r.capabilities) {
-      bool met = false;
-      for (const auto &haveCap : enclave->capabilities)
-        if (needCap.equals(haveCap))
-          met = true;
-      if (!met)
-        error("Symbol " + r.symbol->getName() + " needed, but has unmet requirement "
-            + needCap);
+      if (r.enclave && enclave->name != r.enclave)
+        error("Symbol " + s->getName() + " needed, but can be linked on enclave "
+            + StringRef(r.enclave) + " only");
+
+      for (const auto &needCap : r.capabilities) {
+        bool met = false;
+        for (const auto &haveCap : enclave->capabilities)
+          if (needCap.equals(haveCap))
+            met = true;
+        if (!met)
+          error("Symbol " + s->getName() + " needed, but has unmet requirement "
+              + needCap);
+      }
     }
   }
 }
@@ -2021,22 +2037,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
     processGapsEnclave<ELFT>();
     processGapsRequirements<ELFT>();
     addGapsMain();
-  }
-
-  // <><><>
-  if (enclave) {
-    warn("Enclave " + enclave->name + " has entrypoint "
-        + enclave->entrypoint->getName() + " and the following capabilities:");
-    for (const auto &c : enclave->capabilities)
-      warn("\t" + c);
-
-    for (const auto &r : requirements) {
-      warn("Symbol " + r.symbol->getName() + " requires " +
-        (r.enclave ? "enclave " + StringRef(r.enclave) : StringRef("no enclave")) +
-        " and the following capabilities:");
-      for (const auto &c : r.capabilities)
-        warn("\t" + c);
-    }
   }
 
   // Now that the number of partitions is fixed, save a pointer to the main

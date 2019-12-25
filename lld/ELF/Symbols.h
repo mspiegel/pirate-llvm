@@ -274,6 +274,9 @@ public:
   // The partition whose dynamic symbol table contains this symbol's definition.
   uint8_t partition = 1;
 
+  // Index of the GAPS requirements structure for this symbol.
+  int32_t gapsReqsIdx = -1;
+
   bool isSection() const { return type == llvm::ELF::STT_SECTION; }
   bool isTls() const { return type == llvm::ELF::STT_TLS; }
   bool isFunc() const { return type == llvm::ELF::STT_FUNC; }
