@@ -71,23 +71,6 @@ llvm::Optional<std::string> searchScript(StringRef path);
 llvm::Optional<std::string> searchLibraryBaseName(StringRef path);
 llvm::Optional<std::string> searchLibrary(StringRef path);
 
-struct Enclave {
-  std::string name;
-  std::vector<StringRef> capabilities;
-  Symbol *entrypoint;
-
-  Enclave(std::string n)
-    : name(n), capabilities(), entrypoint(nullptr) {}
-};
-
-struct Requirements {
-  std::vector<StringRef> capabilities;
-  const char *enclave;
-
-  Requirements(std::vector<StringRef> &c, const char *e)
-    : capabilities(c), enclave(e) {}
-};
-
 } // namespace elf
 } // namespace lld
 

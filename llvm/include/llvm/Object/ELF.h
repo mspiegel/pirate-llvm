@@ -390,9 +390,10 @@ template <class ELFT>
 template <typename T>
 Expected<ArrayRef<T>>
 ELFFile<ELFT>::getSectionContentsAsArray(const Elf_Shdr *Sec) const {
-  if (Sec->sh_entsize != sizeof(T) && sizeof(T) != 1)
-    return createError("section " + getSecIndexForError(this, Sec) +
-                       " has an invalid sh_entsize: " + Twine(Sec->sh_entsize));
+  // <><><> Can't set sh_entsize using .section as directive
+  //if (Sec->sh_entsize != sizeof(T) && sizeof(T) != 1)
+  //  return createError("section " + getSecIndexForError(this, Sec) +
+  //                     " has an invalid sh_entsize: " + Twine(Sec->sh_entsize));
 
   uintX_t Offset = Sec->sh_offset;
   uintX_t Size = Sec->sh_size;

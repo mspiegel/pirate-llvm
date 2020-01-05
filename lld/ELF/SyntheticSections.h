@@ -1172,6 +1172,26 @@ struct InStruct {
 
 extern InStruct in;
 
+struct Enclave {
+  std::string name;
+  std::vector<StringRef> capabilities;
+  Symbol *main;
+
+  Enclave(const std::string &n)
+    : name(n), capabilities(), main(nullptr) {}
+
+  Enclave(const std::string &n, const std::vector<StringRef> &c, Symbol *m)
+    : name(n), capabilities(c), main(m) {}
+};
+
+struct Requirements {
+  std::vector<StringRef> capabilities;
+  const char *enclave;
+
+  Requirements(std::vector<StringRef> &c, const char *e)
+    : capabilities(c), enclave(e) {}
+};
+
 } // namespace elf
 } // namespace lld
 

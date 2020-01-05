@@ -1757,10 +1757,10 @@ void processGapsEnclave() {
         warn(StringRef("<><><> ") + (enclave ? "Enclave already defined" : "Allocating new enclave"));
         enclave = enclave ? enclave : new Enclave(config->enclave);
 
-        if (enclave->entrypoint && e->enc_entry)
-          error("Multiple entrypoints specified for enclave " + enclave->name);
+        if (enclave->main && e->enc_main)
+          error("Multiple main function specified for enclave " + enclave->name);
         else
-          enclave->entrypoint = &f->getSymbol(e->enc_entry);
+          enclave->main = &f->getSymbol(e->enc_main);
 
         std::vector<StringRef> caps;
         f->gaps.getSuppliedCaps(e->enc_cap, caps);
@@ -1798,8 +1798,8 @@ void addGapsMain() {
     error("No enclave named " + config->enclave + " defined");
     return;
   }
-  if (!enclave->entrypoint) {
-    error("No entrypoint for " + config->enclave);
+  if (!enclave->main) {
+    error("No main function for " + config->enclave);
     return;
   }
 
@@ -1807,9 +1807,9 @@ void addGapsMain() {
     for (Symbol *s : startSym->file->getSymbols()) {
       if (s->getName().equals("main")) {
         if (s->isUndefined())
-          s->resolve(*enclave->entrypoint);
+          s->resolve(*enclave->main);
         else
-          s->replace(*enclave->entrypoint);
+          s->replace(*enclave->main);
       }
     }
   }

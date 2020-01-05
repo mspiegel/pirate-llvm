@@ -187,6 +187,8 @@ public:
   void printELFLinkerOptions() override;
   void printStackSizes() override;
 
+  void printGapsInfo() override;
+
   const object::ELFObjectFile<ELFT> *getElfObject() const { return ObjF; };
 
 private:
@@ -249,6 +251,12 @@ private:
   const Elf_Shdr *SymbolVersionSection = nullptr;   // .gnu.version
   const Elf_Shdr *SymbolVersionNeedSection = nullptr; // .gnu.version_r
   const Elf_Shdr *SymbolVersionDefSection = nullptr; // .gnu.version_d
+
+  const Elf_Shdr *GapsEnclavesSec = nullptr;
+  const Elf_Shdr *GapsSymreqsSec = nullptr;
+  const Elf_Shdr *GapsCapabilitiesSec = nullptr;
+  const Elf_Shdr *GapsCaptabSec = nullptr;
+  const Elf_Shdr *GapsStrtabSec = nullptr;
 
   // Records for each version index the corresponding Verdef or Vernaux entry.
   // This is filled the first time LoadVersionMap() is called.
@@ -415,6 +423,8 @@ public:
   virtual void printNotes(const ELFFile<ELFT> *Obj) = 0;
   virtual void printELFLinkerOptions(const ELFFile<ELFT> *Obj) = 0;
   virtual void printStackSizes(const ELFObjectFile<ELFT> *Obj) = 0;
+  virtual void printGapsInfo(const ELFObjectFile<ELFT> *Obj,
+                             const Elf_GAPS_Impl<ELFT> &Gaps) = 0;
   void printNonRelocatableStackSizes(const ELFObjectFile<ELFT> *Obj,
                                      std::function<void()> PrintHeader);
   void printRelocatableStackSizes(const ELFObjectFile<ELFT> *Obj,
@@ -482,6 +492,8 @@ public:
   void printELFLinkerOptions(const ELFFile<ELFT> *Obj) override;
   void printStackSizes(const ELFObjectFile<ELFT> *Obj) override;
   void printStackSizeEntry(uint64_t Size, StringRef FuncName) override;
+  void printGapsInfo(const ELFObjectFile<ELFT> *Obj,
+                     const Elf_GAPS_Impl<ELFT> &Gaps) override;
   void printMipsGOT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsPLT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsABIFlags(const ELFObjectFile<ELFT> *Obj) override;
@@ -597,6 +609,8 @@ public:
   void printELFLinkerOptions(const ELFFile<ELFT> *Obj) override;
   void printStackSizes(const ELFObjectFile<ELFT> *Obj) override;
   void printStackSizeEntry(uint64_t Size, StringRef FuncName) override;
+  void printGapsInfo(const ELFObjectFile<ELFT> *Obj,
+                     const Elf_GAPS_Impl<ELFT> &Gaps) override;
   void printMipsGOT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsPLT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsABIFlags(const ELFObjectFile<ELFT> *Obj) override;
@@ -1646,6 +1660,19 @@ ELFDumper<ELFT>::ELFDumper(const object::ELFObjectFile<ELFT> *ObjF,
       if (!DotAddrsigSec)
         DotAddrsigSec = &Sec;
       break;
+    case ELF::SHT_PROGBITS:
+      StringRef name = unwrapOrError(ObjF->getFileName(), Obj->getSectionName(&Sec));
+      if (name.equals(".gaps.enclaves"))
+        GapsEnclavesSec = &Sec;
+      else if (name.equals(".gaps.capabilities"))
+        GapsCapabilitiesSec = &Sec;
+      else if (name.equals(".gaps.symreqs"))
+        GapsSymreqsSec = &Sec;
+      else if (name.equals(".gaps.captab"))
+        GapsCaptabSec = &Sec;
+      else if (name.equals(".gaps.strtab"))
+        GapsStrtabSec = &Sec;
+      break;
     }
   }
 
@@ -1921,6 +1948,23 @@ template <class ELFT> void ELFDumper<ELFT>::printELFLinkerOptions() {
 
 template <class ELFT> void ELFDumper<ELFT>::printStackSizes() {
   ELFDumperStyle->printStackSizes(ObjF);
+}
+
+template <class ELFT> void ELFDumper<ELFT>::printGapsInfo() {
+  const ELFFile<ELFT> *Obj = ObjF->getELFFile();
+  Elf_GAPS_Impl<ELFT> Gaps;
+  Gaps.enclaves = unwrapOrError(ObjF->getFileName(),
+      Obj->template getSectionContentsAsArray<Elf_GAPS_enc<ELFT>>(GapsEnclavesSec));
+  Gaps.capabilities = unwrapOrError(ObjF->getFileName(),
+      Obj->template getSectionContentsAsArray<Elf_GAPS_cap<ELFT>>(GapsCapabilitiesSec));
+  Gaps.symreqs = unwrapOrError(ObjF->getFileName(),
+      Obj->template getSectionContentsAsArray<Elf_GAPS_req<ELFT>>(GapsSymreqsSec));
+  Gaps.captab = unwrapOrError(ObjF->getFileName(),
+      Obj->template getSectionContentsAsArray<uint32_t>(GapsCaptabSec));
+  Gaps.strtab = unwrapOrError(ObjF->getFileName(),
+      Obj->template getSectionContentsAsArray<char>(GapsStrtabSec));
+
+  ELFDumperStyle->printGapsInfo(ObjF, Gaps);
 }
 
 #define LLVM_READOBJ_DT_FLAG_ENT(prefix, enum)                                 \
@@ -5030,6 +5074,150 @@ void GNUStyle<ELFT>::printStackSizes(const ELFObjectFile<ELFT> *Obj) {
 }
 
 template <class ELFT>
+void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
+                                   const Elf_GAPS_Impl<ELFT> &Gaps) {
+  auto Symbols = ObjF->symbols();
+  auto Symtab = std::vector<elf_symbol_iterator>(Symbols.begin(), Symbols.end());
+
+  auto PrintEnclavesHeader = [&]() {
+    OS << "\nGAPS Enclaves:\n";
+    OS.PadToColumn(8);
+    OS << "Name";
+    OS.PadToColumn(30);
+    OS << "Main symbol";
+    OS.PadToColumn(54);
+    OS << "Capabilities\n";
+  };
+
+  auto PrintEnclave = [&](const Elf_GAPS_enc<ELFT> &Enc) {
+    static uint32_t i = 0;
+
+    std::string EncName = to_string(format_decimal(Enc.enc_name, 1));
+    if (Enc.enc_name)
+      EncName = to_string(Gaps.getStrtabEntry(Enc.enc_name));
+
+    std::string MainSym = to_string(format_decimal(Enc.enc_main, 1));
+    if (Enc.enc_main) {
+      Expected<StringRef> Name = Symtab[Enc.enc_main - 1]->getName();
+      MainSym = to_string(Name ? Name.get() : "?") + " (" + MainSym + ")";
+    }
+
+    std::string CapList = to_string(format_decimal(Enc.enc_cap, 1));
+    if (Enc.enc_cap) {
+      CapList += ": ";
+      for (uint32_t i = Enc.enc_cap; Gaps.captab[i]; ++i) {
+        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[i]];
+        CapList += to_string(Gaps.getStrtabEntry(Cap.cap_name));
+        CapList += " (" + to_string(Gaps.captab[i]) + ")";
+        if (Gaps.captab[i+1])
+          CapList += ", ";
+      }
+    }
+
+    OS.PadToColumn(2);
+    OS << i++;
+    OS.PadToColumn(8);
+    OS << EncName;
+    OS.PadToColumn(30);
+    OS << MainSym;
+    OS.PadToColumn(54);
+    OS << CapList << "\n";
+  };
+
+  auto PrintSymreqsHeader = [&]() {
+    OS << "\nGAPS Requirements:\n";
+    OS.PadToColumn(2);
+    OS << "Symbol";
+    OS.PadToColumn(24);
+    OS << "Enclave";
+    OS.PadToColumn(48);
+    OS << "Capabilities\n";
+  };
+
+  auto PrintSymreq = [&](const Elf_GAPS_req<ELFT> &Req) {
+    std::string Sym = to_string(format_decimal(Req.req_sym, 1));
+    if (Req.req_sym) {
+      Expected<StringRef> Name = Symtab[Req.req_sym - 1]->getName();
+      Sym = to_string(Name ? Name.get() : "?") + " (" + Sym + ")";
+    }
+
+    std::string EncName = to_string(format_decimal(Req.req_enc, 1));
+    if (Req.req_enc) {
+      Elf_GAPS_enc<ELFT> Enc = Gaps.enclaves[Req.req_enc];
+      EncName = to_string(Gaps.getStrtabEntry(Enc.enc_name)) + " (" + EncName + ")";
+    }
+
+    std::string CapList = to_string(format_decimal(Req.req_cap, 1));
+    if (Req.req_cap) {
+      CapList.clear();
+      for (uint32_t i = Req.req_cap; Gaps.captab[i]; ++i) {
+        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[i]];
+        CapList += to_string(Gaps.getStrtabEntry(Cap.cap_name));
+        CapList += " (" + to_string(Gaps.captab[i]) + ")";
+        if (Gaps.captab[i+1])
+          CapList += ", ";
+      }
+    }
+
+    OS.PadToColumn(2);
+    OS << Sym;
+    OS.PadToColumn(24);
+    OS << EncName;
+    OS.PadToColumn(48);
+    OS << CapList << "\n";
+  };
+
+  auto PrintCapsHeader = [&]() {
+    OS << "\nGAPS Capabilities\n";
+    OS.PadToColumn(8);
+    OS << "Name";
+    OS.PadToColumn(30);
+    OS << "Parent" << "\n";
+  };
+
+  auto PrintCap = [&](const Elf_GAPS_cap<ELFT> &Cap) {
+    static uint32_t i = 0;
+
+    std::string Name = Gaps.getStrtabEntry(Cap.cap_name);
+
+    std::string Parent = to_string(Cap.cap_parent);
+    if (Cap.cap_parent) {
+      const auto &ParentCap = Gaps.capabilities[Cap.cap_parent];
+      Parent = to_string(Gaps.getStrtabEntry(ParentCap.cap_name)) + " (" + Parent + ")";
+    }
+
+    OS.PadToColumn(2);
+    OS << i++;
+    OS.PadToColumn(8);
+    OS << Name;
+    OS.PadToColumn(30);
+    OS << Parent << "\n";
+  };
+
+  if (Gaps.enclaves.empty()) {
+    OS << "There are no GAPS enclaves in this file";
+  } else {
+    PrintEnclavesHeader();
+    for (const Elf_GAPS_enc<ELFT> &Enc : Gaps.enclaves)
+      PrintEnclave(Enc);
+  }
+  if (Gaps.symreqs.empty()) {
+    OS << "There are no GAPS symbol requirements in this file";
+  } else {
+    PrintSymreqsHeader();
+    for (const Elf_GAPS_req<ELFT> &Req : Gaps.symreqs)
+      PrintSymreq(Req);
+  }
+  if (Gaps.capabilities.empty()) {
+    OS << "There are no GAPS capabilities in this file";
+  } else {
+    PrintCapsHeader();
+    for (const Elf_GAPS_cap<ELFT> &Cap : Gaps.capabilities)
+      PrintCap(Cap);
+  }
+}
+
+template <class ELFT>
 void GNUStyle<ELFT>::printMipsGOT(const MipsGOTParser<ELFT> &Parser) {
   size_t Bias = ELFT::Is64Bits ? 8 : 0;
   auto PrintEntry = [&](const Elf_Addr *E, StringRef Purpose) {
@@ -6045,6 +6233,93 @@ void LLVMStyle<ELFT>::printStackSizeEntry(uint64_t Size, StringRef FuncName) {
   DictScope D(W, "Entry");
   W.printString("Function", FuncName);
   W.printHex("Size", Size);
+}
+
+template <class ELFT>
+void LLVMStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
+                                    const Elf_GAPS_Impl<ELFT> &Gaps) {
+  auto Symbols = ObjF->symbols();
+  auto Symtab = std::vector<elf_symbol_iterator>(Symbols.begin(), Symbols.end());
+
+  DictScope D(W, "GAPS Info");
+  {
+    ListScope L(W, "Enclaves");
+
+    for (size_t i = 0; i < Gaps.enclaves.size(); ++i) {
+      const Elf_GAPS_enc<ELFT> &Enc = Gaps.enclaves[i];
+
+      std::string EncName = to_string(format_decimal(Enc.enc_name, 1));
+      if (Enc.enc_name)
+        EncName = "(" + to_string(i) + ") " + to_string(Gaps.getStrtabEntry(Enc.enc_name));
+
+      DictScope D(W, "Enclave " + EncName);
+
+      std::string MainSym = to_string(format_decimal(Enc.enc_main, 1));
+      if (Enc.enc_main) {
+        Expected<StringRef> Name = Symtab[Enc.enc_main - 1]->getName();
+        MainSym = to_string(Name ? Name.get() : "?") + " (" + MainSym + ")";
+      }
+
+      W.printString("Main symbol", MainSym);
+
+      ListScope L(W, "Capabilities");
+
+      for (size_t j = Enc.enc_cap; Gaps.captab[j]; ++j) {
+        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[j]];
+        W.startLine() << to_string(Gaps.getStrtabEntry(Cap.cap_name)) +
+            " (" + to_string(Gaps.captab[j]) + ")\n";
+      }
+    }
+  }
+  {
+    ListScope L(W, "Symreqs");
+
+    for (const Elf_GAPS_req<ELFT> &Req : Gaps.symreqs) {
+      std::string Sym = to_string(format_decimal(Req.req_sym, 1));
+      if (Req.req_sym) {
+        Expected<StringRef> Name = Symtab[Req.req_sym - 1]->getName();
+        Sym = "(" + Sym + ") " + to_string(Name ? Name.get() : "?");
+      }
+
+      DictScope D(W, "Requirements for symbol " + Sym);
+
+      std::string EncName = to_string(format_decimal(Req.req_enc, 1));
+      if (Req.req_enc) {
+        Elf_GAPS_enc<ELFT> Enc = Gaps.enclaves[Req.req_enc];
+        EncName = to_string(Gaps.getStrtabEntry(Enc.enc_name)) + " (" + EncName + ")";
+      }
+
+      W.printString("Enclave", EncName);
+
+      ListScope L(W, "Capabilities");
+
+      for (uint32_t j = Req.req_cap; Gaps.captab[j]; ++j) {
+        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[j]];
+        W.startLine() << to_string(Gaps.getStrtabEntry(Cap.cap_name)) +
+            " (" + to_string(Gaps.captab[j]) + ")\n";
+      }
+    }
+  }
+  {
+    ListScope L(W, "Capabilities");
+    for (size_t i = 0; i < Gaps.capabilities.size(); ++i) {
+      const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[i];
+
+      std::string Name = to_string(i);
+      if (i)
+        Name = "(" + Name + ") " + to_string(Gaps.getStrtabEntry(Cap.cap_name));
+
+      DictScope D(W, "Capability " + Name);
+
+      std::string Parent = to_string(Cap.cap_parent);
+      if (Cap.cap_parent) {
+        const auto &ParentCap = Gaps.capabilities[Cap.cap_parent];
+        Parent = to_string(Gaps.getStrtabEntry(ParentCap.cap_name)) + " (" + Parent + ")";
+      }
+
+      W.printString("Parent", Parent);
+    }
+  }
 }
 
 template <class ELFT>
