@@ -1307,4 +1307,11 @@ def ext_concept_legacy_bool_keyword : ExtWarn<
   InGroup<DiagGroup<"concepts-ts-compat">>;
 }
 
+def warn_pragma_enclave : Warning<
+  "Bad enclave pragma">,
+  InGroup<IgnoredPragmas>;
+def warn_pragma_capability : Warning<
+  "Bad capability pragma">,
+  InGroup<IgnoredPragmas>;
+
 } // end of Parser diagnostics

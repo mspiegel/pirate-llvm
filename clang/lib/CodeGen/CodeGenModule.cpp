@@ -97,7 +97,8 @@ CodeGenModule::CodeGenModule(ASTContext &C, const HeaderSearchOptions &HSO,
       PreprocessorOpts(PPO), CodeGenOpts(CGO), TheModule(M), Diags(diags),
       Target(C.getTargetInfo()), ABI(createCXXABI(*this)),
       VMContext(M.getContext()), Types(*this), VTables(*this),
-      SanitizerMD(new SanitizerMetadata(*this)) {
+      SanitizerMD(new SanitizerMetadata(*this))
+       {
 
   // Initialize the type cache.
   llvm::LLVMContext &LLVMContext = M.getContext();
@@ -449,6 +450,8 @@ void CodeGenModule::Release() {
       (Context.getLangOpts().Modules || !LinkerOptionsMetadata.empty())) {
     EmitModuleLinkOptions();
   }
+
+  EmitGapsMetadata();
 
   // On ELF we pass the dependent library specifiers directly to the linker
   // without manipulating them. This is in contrast to other platforms where
@@ -5891,4 +5894,39 @@ CodeGenModule::createOpenCLIntToSamplerConversion(const Expr *E,
   return CGF.Builder.CreateCall(CreateRuntimeFunction(FTy,
                                 "__translate_sampler_initializer"),
                                 {C});
+}
+
+void CodeGenModule::EmitGapsMetadata() {
+
+  llvm::LLVMContext &Ctx = TheModule.getContext();
+
+  auto *NMD = getModule().getOrInsertNamedMetadata("gaps.capabilities");
+  for (auto const& cap : Context.Capabilities) {
+    llvm::MDNode* node;
+    llvm::MDString* name = llvm::MDString::get(Ctx, cap.first);
+
+    if (cap.second.empty()) {
+      llvm::MDString* name = llvm::MDString::get(Ctx, cap.first);
+      node = llvm::MDNode::get(Ctx, {name});
+    } else {
+      llvm::MDString* parent = llvm::MDString::get(Ctx, cap.second);
+      node = llvm::MDNode::get(Ctx, {name, parent});
+    }
+    NMD->addOperand(node);
+  }
+
+  NMD = getModule().getOrInsertNamedMetadata("gaps.enclaves");
+  for (auto const& enclave : Context.Enclaves) {
+    llvm::MDString* name = llvm::MDString::get(Ctx, enclave);
+    llvm::MDNode* node = llvm::MDNode::get(Ctx, {name});
+    NMD->addOperand(node);
+  }
+
+  NMD = getModule().getOrInsertNamedMetadata("gaps.enclave_capabilities");
+  for (auto const& assoc : Context.EnclaveCapabilities) {
+    llvm::MDString* enclave = llvm::MDString::get(Ctx, assoc.first);
+    llvm::MDString* capability = llvm::MDString::get(Ctx, assoc.second);
+    llvm::MDNode* node = llvm::MDNode::get(Ctx, {enclave, capability});
+    NMD->addOperand(node);
+  }
 }

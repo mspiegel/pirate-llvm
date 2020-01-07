@@ -993,16 +993,20 @@ void Sema::PopPragmaVisibility(bool IsNamespaceEnd, SourceLocation EndLoc) {
 
 void Sema::ActOnPragmaDeclareEnclave(StringRef Name)
 {
+  Context.Enclaves.push_back(Name);
 }
 
-void Sema::ActOnPragmaDeclareEnclaveCapability(StringRef enclave, StringRef capability)
+void Sema::ActOnPragmaEnclaveCapability(StringRef enclave, StringRef capability)
 {
+  Context.EnclaveCapabilities.push_back(std::make_pair(enclave, capability));
 }
 
 void Sema::ActOnPragmaDeclareCapability(StringRef Name)
 {
+  Context.Capabilities.push_back(std::make_pair(Name, ""));
 }
 
 void Sema::ActOnPragmaDeclareCapability(StringRef Name, StringRef Parent)
 {
+  Context.Capabilities.push_back(std::make_pair(Name, Parent));
 }

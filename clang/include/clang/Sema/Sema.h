@@ -8717,7 +8717,7 @@ public:
   };
 
   void ActOnPragmaDeclareEnclave(StringRef enclave);
-  void ActOnPragmaDeclareEnclaveCapability(StringRef enclave, StringRef capability);
+  void ActOnPragmaEnclaveCapability(StringRef enclave, StringRef capability);
   void ActOnPragmaDeclareCapability(StringRef sensitivity);
   void ActOnPragmaDeclareCapability(StringRef sensitivity, StringRef parent);
 

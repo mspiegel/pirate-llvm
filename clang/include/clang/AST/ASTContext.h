@@ -574,6 +574,10 @@ private:
   std::unique_ptr<interp::Context> InterpContext;
 
 public:
+  std::vector<StringRef> Enclaves;
+  std::vector<std::pair<StringRef, StringRef>> Capabilities;
+  std::vector<std::pair<StringRef, StringRef>> EnclaveCapabilities;
+
   IdentifierTable &Idents;
   SelectorTable &Selectors;
   Builtin::Context &BuiltinInfo;

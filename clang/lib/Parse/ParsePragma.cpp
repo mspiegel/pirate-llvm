@@ -3430,7 +3430,7 @@ void PragmaEnclaveHandler::HandlePragma(
   if (command == "declare" && args.size() == 1) {
     Actions.ActOnPragmaDeclareEnclave(args[0]);
   } else if (command == "capability" && args.size() == 2) {
-    Actions.ActOnPragmaDeclareEnclaveCapability(args[0], args[1]);
+    Actions.ActOnPragmaEnclaveCapability(args[0], args[1]);
   } else {
     PP.Diag(Tok, diag::warn_pragma_enclave);
     return;
