@@ -66,17 +66,19 @@ using namespace llvm::object;
 using namespace llvm::sys;
 using namespace llvm::support;
 
-using namespace lld;
-using namespace lld::elf;
+namespace lld {
+namespace elf {
 
-Configuration *elf::config;
-LinkerDriver *elf::driver;
+Configuration *config;
+LinkerDriver *driver;
+
+static Enclave *enclave = nullptr;
+static std::vector<Requirements> requirements;
 
 static void setConfigs(opt::InputArgList &args);
 static void readConfigs(opt::InputArgList &args);
 
-bool elf::link(ArrayRef<const char *> args, bool canExitEarly,
-               raw_ostream &error) {
+bool link(ArrayRef<const char *> args, bool canExitEarly, raw_ostream &error) {
   errorHandler().logName = args::getFilenameWithoutExe(args[0]);
   errorHandler().errorLimitExceededMsg =
       "too many errors emitted, stopping now (use "
@@ -91,6 +93,7 @@ bool elf::link(ArrayRef<const char *> args, bool canExitEarly,
   bitcodeFiles.clear();
   objectFiles.clear();
   sharedFiles.clear();
+  requirements.clear();
 
   config = make<Configuration>();
   driver = make<LinkerDriver>();
@@ -335,6 +338,8 @@ static void checkOptions() {
       error("-r and --icf may not be used together");
     if (config->pie)
       error("-r and -pie may not be used together");
+    if (config->exportDynamic)
+      error("-r and --export-dynamic may not be used together");
   }
 
   if (config->executeOnly) {
@@ -393,6 +398,19 @@ static SeparateSegmentKind getZSeparate(opt::InputArgList &args) {
   return SeparateSegmentKind::None;
 }
 
+static GnuStackKind getZGnuStack(opt::InputArgList &args) {
+  for (auto *arg : args.filtered_reverse(OPT_z)) {
+    if (StringRef("execstack") == arg->getValue())
+      return GnuStackKind::Exec;
+    if (StringRef("noexecstack") == arg->getValue())
+      return GnuStackKind::NoExec;
+    if (StringRef("nognustack") == arg->getValue())
+      return GnuStackKind::None;
+  }
+
+  return GnuStackKind::NoExec;
+}
+
 static bool isKnownZFlag(StringRef s) {
   return s == "combreloc" || s == "copyreloc" || s == "defs" ||
          s == "execstack" || s == "global" || s == "hazardplt" ||
@@ -401,6 +419,7 @@ static bool isKnownZFlag(StringRef s) {
          s == "separate-code" || s == "separate-loadable-segments" ||
          s == "nocombreloc" || s == "nocopyreloc" || s == "nodefaultlib" ||
          s == "nodelete" || s == "nodlopen" || s == "noexecstack" ||
+         s == "nognustack" ||
          s == "nokeep-text-section-prefix" || s == "norelro" ||
          s == "noseparate-code" || s == "notext" || s == "now" ||
          s == "origin" || s == "relro" || s == "retpolineplt" ||
@@ -851,6 +870,7 @@ static void readConfigs(opt::InputArgList &args) {
       OPT_call_graph_profile_sort, OPT_no_call_graph_profile_sort, true);
   config->enableNewDtags =
       args.hasFlag(OPT_enable_new_dtags, OPT_disable_new_dtags, true);
+  config->enclave = args.getLastArgValue(OPT_enclave);
   config->entry = args.getLastArgValue(OPT_entry);
   config->executeOnly =
       args.hasFlag(OPT_execute_only, OPT_no_execute_only, false);
@@ -862,7 +882,9 @@ static void readConfigs(opt::InputArgList &args) {
   config->fixCortexA8 = args.hasArg(OPT_fix_cortex_a8);
   config->forceBTI = args.hasArg(OPT_force_bti);
   config->requireCET = args.hasArg(OPT_require_cet);
-  config->gcSections = args.hasFlag(OPT_gc_sections, OPT_no_gc_sections, false);
+  config->gcSections =
+    args.hasFlag(OPT_gc_sections, OPT_no_gc_sections, false) ||
+    args.hasFlag(OPT_enclave, OPT_no_gc_sections, false);
   config->gnuUnique = args.hasFlag(OPT_gnu_unique, OPT_no_gnu_unique, true);
   config->gdbIndex = args.hasFlag(OPT_gdb_index, OPT_no_gdb_index, false);
   config->icf = getICF(args);
@@ -885,6 +907,8 @@ static void readConfigs(opt::InputArgList &args) {
   config->mipsGotSize = args::getInteger(args, OPT_mips_got_size, 0xfff0);
   config->mergeArmExidx =
       args.hasFlag(OPT_merge_exidx_entries, OPT_no_merge_exidx_entries, true);
+  config->mmapOutputFile =
+      args.hasFlag(OPT_mmap_output_file, OPT_no_mmap_output_file, true);
   config->nmagic = args.hasFlag(OPT_nmagic, OPT_no_nmagic, false);
   config->noinhibitExec = args.hasArg(OPT_noinhibit_exec);
   config->nostdlib = args.hasArg(OPT_nostdlib);
@@ -950,6 +974,7 @@ static void readConfigs(opt::InputArgList &args) {
   config->zCopyreloc = getZFlag(args, "copyreloc", "nocopyreloc", true);
   config->zExecstack = getZFlag(args, "execstack", "noexecstack", false);
   config->zGlobal = hasZOption(args, "global");
+  config->zGnustack = getZGnuStack(args);
   config->zHazardplt = hasZOption(args, "hazardplt");
   config->zIfuncNoplt = hasZOption(args, "ifunc-noplt");
   config->zInitfirst = hasZOption(args, "initfirst");
@@ -1369,7 +1394,7 @@ static void handleUndefined(Symbol *sym) {
     sym->fetch();
 }
 
-// As an extention to GNU linkers, lld supports a variant of `-u`
+// As an extension to GNU linkers, lld supports a variant of `-u`
 // which accepts wildcard patterns. All symbols that match a given
 // pattern are handled as if they were given by `-u`.
 static void handleUndefinedGlob(StringRef arg) {
@@ -1561,6 +1586,28 @@ static Symbol *addUndefined(StringRef name) {
       Undefined{nullptr, name, STB_GLOBAL, STV_DEFAULT, 0});
 }
 
+template <typename ELFT>
+static void readGapsSection(InputSectionBase *s) {
+  if (s->name == ".gaps.enclaves") {
+    warn("<><><> Found .gaps.enclaves with size " + std::to_string(s->data().size())
+        + " in file " + s->getFile<ELFT>()->getName());
+    s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>();
+    warn("<><><> It has " + std::to_string(s->getFile<ELFT>()->gaps.enclaves.size()) + " entries");
+  } else if (s->name == ".gaps.symreqs") {
+    warn("<><><> Found .gaps.symreqs");
+    s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>();
+  } else if (s->name == ".gaps.capabilities") {
+    warn("<><><> Found .gaps.capabilities");
+    s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>();
+  } else if (s->name == ".gaps.captab") {
+    warn("<><><> Found .gaps.captab");
+    s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
+  } else if (s->name == ".gaps.strtab") {
+    warn("<><><> Found .gaps.strtab");
+    s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
+  }
+}
+
 // This function is where all the optimizations of link-time
 // optimization takes place. When LTO is in use, some input files are
 // not in native object file format but in the LLVM bitcode format.
@@ -1692,6 +1739,110 @@ template <class ELFT> static uint32_t getAndFeatures() {
   return ret;
 }
 
+template <typename ELFT>
+void processGapsEnclave() {
+  for (InputFile *f_ : objectFiles) {
+    warn("<><><> Processing file " + f_->getName());
+    auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
+    if (!f)
+      continue;
+    warn("<><><> It's an ObjFile!");
+
+    warn("<><><> Found " + std::to_string(f->gaps.enclaves.size()) + " enclaves");
+    for (auto e = f->gaps.enclaves.begin() + 1; e < f->gaps.enclaves.end(); ++e) {
+      StringRef name = f->gaps.getStrtabEntry(e->enc_name);
+
+      warn("<><><> Found enclave named " + name);
+      if (name.equals(config->enclave)) {
+        warn(StringRef("<><><> ") + (enclave ? "Enclave already defined" : "Allocating new enclave"));
+        enclave = enclave ? enclave : new Enclave(config->enclave);
+
+        if (enclave->main && e->enc_main)
+          error("Multiple main function specified for enclave " + enclave->name);
+        else
+          enclave->main = &f->getSymbol(e->enc_main);
+
+        std::vector<StringRef> caps;
+        f->gaps.getSuppliedCaps(e->enc_cap, caps);
+        enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
+      }
+    }
+  }
+}
+
+template <typename ELFT>
+void processGapsRequirements() {
+  for (InputFile *f_ : objectFiles) {
+    warn("<><><> Processing file " + f_->getName());
+    auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
+    if (!f)
+      continue;
+    warn("<><><> It's an ObjFile!");
+
+    for (auto r = f->gaps.symreqs.begin(); r < f->gaps.symreqs.end(); ++r) {
+      std::vector<StringRef> caps;
+      f->gaps.getRequiredCaps(r->req_cap, caps);
+      const char *enclaveName = r->req_enc
+          ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data()
+          : nullptr;
+      Symbol *symbol = &f->getSymbol(r->req_sym);
+
+      requirements.emplace_back(caps, enclaveName);
+      symbol->gapsReqsIdx = requirements.size() - 1;
+    }
+  }
+}
+
+void addGapsMain() {
+  if (!enclave) {
+    error("No enclave named " + config->enclave + " defined");
+    return;
+  }
+  if (!enclave->main) {
+    error("No main function for " + config->enclave);
+    return;
+  }
+
+  if (Symbol *startSym = symtab->find(config->entry)) {
+    for (Symbol *s : startSym->file->getSymbols()) {
+      if (s->getName().equals("main")) {
+        if (s->isUndefined())
+          s->resolve(*enclave->main);
+        else
+          s->replace(*enclave->main);
+      }
+    }
+  }
+}
+
+void checkGapsRequirements() {
+  for (InputFile *f : objectFiles) {
+    for (Symbol *s : f->getSymbols()) {
+      if (s->gapsReqsIdx < 0)
+        continue;
+      Requirements &r = requirements[s->gapsReqsIdx];
+
+      auto *d = dyn_cast_or_null<Defined>(s);
+      if (!d || !d->section->isLive())
+        continue;
+
+      if (r.enclave && enclave->name != r.enclave)
+        error("Symbol " + s->getName() + " needed, but can be linked on enclave "
+            + StringRef(r.enclave) + " only");
+
+      for (const auto &needCap : r.capabilities) {
+        bool met = false;
+        for (const auto &haveCap : enclave->capabilities)
+          if (needCap.equals(haveCap))
+            met = true;
+        if (!met)
+          error("Symbol " + s->getName() + " needed, but has unmet requirement "
+              + needCap);
+      }
+    }
+  }
+}
+
 // Do actual linking. Note that when this function is called,
 // all linker scripts have already been parsed.
 template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
@@ -1763,6 +1914,12 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // Handle the `--undefined-glob <pattern>` options.
   for (StringRef pat : args::getStrings(args, OPT_undefined_glob))
     handleUndefinedGlob(pat);
+
+  // Mark -init and -fini symbols so that the LTO doesn't eliminate them.
+  if (Symbol *sym = symtab->find(config->init))
+    sym->isUsedInRegularObj = true;
+  if (Symbol *sym = symtab->find(config->fini))
+    sym->isUsedInRegularObj = true;
 
   // If any of our inputs are bitcode files, the LTO code generator may create
   // references to certain library functions that might not be explicit in the
@@ -1864,11 +2021,23 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
       return true;
     }
 
+    // Handle GAPS sections
+    if (!config->enclave.empty() && s->name.startswith(".gaps")) {
+      readGapsSection<ELFT>(s);
+      return true;
+    }
+
     // We do not want to emit debug sections if --strip-all
     // or -strip-debug are given.
     return config->strip != StripPolicy::None &&
            (s->name.startswith(".debug") || s->name.startswith(".zdebug"));
   });
+
+  if (!config->enclave.empty()) {
+    processGapsEnclave<ELFT>();
+    processGapsRequirements<ELFT>();
+    addGapsMain();
+  }
 
   // Now that the number of partitions is fixed, save a pointer to the main
   // partition.
@@ -1914,11 +2083,13 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // Replace common symbols with regular symbols.
   replaceCommonSymbols();
 
-  // Do size optimizations: garbage collection, merging of SHF_MERGE sections
-  // and identical code folding.
+  // Split SHF_MERGE and .eh_frame sections into pieces in preparation for garbage collection.
   splitSections<ELFT>();
+
+  // Garbage collection and removal of shared symbols from unused shared objects.
   markLive<ELFT>();
   demoteSharedSymbols();
+  checkGapsRequirements();
 
   // Make copies of any input sections that need to be copied into each
   // partition.
@@ -1970,3 +2141,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // Write the result to the file.
   writeResult<ELFT>();
 }
+
+} // namespace elf
+} // namespace lld

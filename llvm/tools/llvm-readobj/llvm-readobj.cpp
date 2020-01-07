@@ -314,6 +314,11 @@ namespace opts {
       PrintStackSizes("stack-sizes",
                       cl::desc("Display contents of all stack sizes sections"));
 
+  // --gaps-info
+  cl::opt<bool>
+      PrintGapsInfo("gaps-info",
+                    cl::desc("Display GAPS extension information"));
+
   // --version-info, -V
   cl::opt<bool>
       VersionInfo("version-info",
@@ -503,6 +508,8 @@ static void dumpObject(const ObjectFile *Obj, ScopedPrinter &Writer,
       Dumper->printAddrsig();
     if (opts::Notes)
       Dumper->printNotes();
+    if (opts::PrintGapsInfo)
+      Dumper->printGapsInfo();
   }
   if (Obj->isCOFF()) {
     if (opts::COFFImports)
@@ -691,8 +698,10 @@ int main(int argc, const char *argv[]) {
     opts::UnwindInfo = true;
     opts::SectionGroups = true;
     opts::HashHistogram = true;
-    if (opts::Output == opts::LLVM)
+    if (opts::Output == opts::LLVM) {
+      opts::Addrsig = true;
       opts::PrintStackSizes = true;
+    }
   }
 
   if (opts::Headers) {

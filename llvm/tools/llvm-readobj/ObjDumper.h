@@ -70,6 +70,7 @@ public:
   virtual void printELFLinkerOptions() {}
   virtual void printStackSizes() {}
   virtual void printArchSpecificInfo() { }
+  virtual void printGapsInfo() {};
 
   // Only implemented for PE/COFF.
   virtual void printCOFFImports() { }

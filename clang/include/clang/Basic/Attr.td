@@ -594,6 +594,13 @@ def Alias : Attr {
   let Documentation = [Undocumented];
 }
 
+def ArmMveAlias : InheritableAttr, TargetSpecificAttr<TargetARM> {
+  let Spellings = [Clang<"__clang_arm_mve_alias">];
+  let Args = [IdentifierArgument<"BuiltinName">];
+  let Subjects = SubjectList<[Function], ErrorDiag>;
+  let Documentation = [ArmMveAliasDocs];
+}
+
 def Aligned : InheritableAttr {
   let Spellings = [GCC<"aligned">, Declspec<"align">, Keyword<"alignas">,
                    Keyword<"_Alignas">];
@@ -2020,6 +2027,14 @@ def PragmaClangRodataSection : InheritableAttr {
   let Documentation = [Undocumented];
 }
 
+def PragmaClangRelroSection : InheritableAttr {
+  // This attribute has no spellings as it is only ever created implicitly.
+  let Spellings = [];
+  let Args = [StringArgument<"Name">];
+  let Subjects = SubjectList<[GlobalVar], ErrorDiag>;
+  let Documentation = [Undocumented];
+}
+
 def PragmaClangTextSection : InheritableAttr {
   // This attribute has no spellings as it is only ever created implicitly.
   let Spellings = [];
@@ -3297,19 +3312,13 @@ def OMPDeclareVariant : InheritableAttr {
                  [
                    "CtxSetUnknown", "CtxSetImplementation"
                  ]>,
-    EnumArgument<"CtxScore", "ScoreType",
-                 [ "", "score"
-                 ],
-                 [
-                   "ScoreUnknown", "ScoreSpecified"
-                 ]>,
     EnumArgument<"CtxSelector", "CtxSelectorType",
                  [ "", "vendor"
                  ],
                  [
                    "CtxUnknown", "CtxVendor"
                  ]>,
-    StringArgument<"ImplVendor", 1>
+    VariadicStringArgument<"ImplVendors">
   ];
   let AdditionalMembers = [{
     void printScore(raw_ostream & OS, const PrintingPolicy &Policy) const {
@@ -3337,7 +3346,11 @@ def OMPDeclareVariant : InheritableAttr {
         case CtxVendor:
           OS << "vendor(";
           printScore(OS, Policy);
-          OS << getImplVendor();
+          if (implVendors_size() > 0) {
+            OS << *implVendors(). begin();
+            for (StringRef VendorName : llvm::drop_begin(implVendors(), 1))
+              OS << ", " << VendorName;
+          }
           OS << ")";
           break;
         case CtxUnknown:
@@ -3409,6 +3422,13 @@ def ObjCExternallyRetained : InheritableAttr {
   let Documentation = [ObjCExternallyRetainedDocs];
 }
 
+def NoBuiltin : Attr {
+  let Spellings = [Clang<"no_builtin">];
+  let Args = [VariadicStringArgument<"BuiltinNames">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [NoBuiltinDocs];
+}
+
 def EnclaveOnly : InheritableAttr {
   let Spellings = [Clang<"enclave_only">];
   let Subjects = SubjectList<[Function, GlobalVar]>;
@@ -3422,3 +3442,4 @@ def EnclaveMain : InheritableAttr {
   let Documentation = [EnclaveMainDocs];
   let Args = [StringArgument<"EnclaveName">];
 }
+

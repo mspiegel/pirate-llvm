@@ -1055,9 +1055,9 @@ public:
 };
 
 // This section is used to store the addresses of functions that are called
-// in range-extending thunks on PowerPC64. When producing position dependant
+// in range-extending thunks on PowerPC64. When producing position dependent
 // code the addresses are link-time constants and the table is written out to
-// the binary. When producing position-dependant code the table is allocated and
+// the binary. When producing position-dependent code the table is allocated and
 // filled in by the dynamic linker.
 class PPC64LongBranchTargetSection final : public SyntheticSection {
 public:
@@ -1171,6 +1171,26 @@ struct InStruct {
 };
 
 extern InStruct in;
+
+struct Enclave {
+  std::string name;
+  std::vector<StringRef> capabilities;
+  Symbol *main;
+
+  Enclave(const std::string &n)
+    : name(n), capabilities(), main(nullptr) {}
+
+  Enclave(const std::string &n, const std::vector<StringRef> &c, Symbol *m)
+    : name(n), capabilities(c), main(m) {}
+};
+
+struct Requirements {
+  std::vector<StringRef> capabilities;
+  const char *enclave;
+
+  Requirements(std::vector<StringRef> &c, const char *e)
+    : capabilities(c), enclave(e) {}
+};
 
 } // namespace elf
 } // namespace lld

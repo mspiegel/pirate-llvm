@@ -137,7 +137,7 @@ namespace {
 
   /// Given an expression, determine the type used to store the result of
   /// evaluating that expression.
-  static QualType getStorageType(ASTContext &Ctx, Expr *E) {
+  static QualType getStorageType(const ASTContext &Ctx, const Expr *E) {
     if (E->isRValue())
       return E->getType();
     return Ctx.getLValueReferenceType(E->getType());
@@ -1039,10 +1039,13 @@ namespace {
     /// cleanups would have had a side-effect, note that as an unmodeled
     /// side-effect and return false. Otherwise, return true.
     bool discardCleanups() {
-      for (Cleanup &C : CleanupStack)
-        if (C.hasSideEffect())
-          if (!noteSideEffect())
-            return false;
+      for (Cleanup &C : CleanupStack) {
+        if (C.hasSideEffect() && !noteSideEffect()) {
+          CleanupStack.clear();
+          return false;
+        }
+      }
+      CleanupStack.clear();
       return true;
     }
 
@@ -3178,7 +3181,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
   // Walk the designator's path to find the subobject.
   for (unsigned I = 0, N = Sub.Entries.size(); /**/; ++I) {
     // Reading an indeterminate value is undefined, but assigning over one is OK.
-    if ((O->isAbsent() && handler.AccessKind != AK_Construct) ||
+    if ((O->isAbsent() && !(handler.AccessKind == AK_Construct && I == N)) ||
         (O->isIndeterminate() && handler.AccessKind != AK_Construct &&
          handler.AccessKind != AK_Assign &&
          handler.AccessKind != AK_ReadObjectRepresentation)) {
@@ -4435,7 +4438,7 @@ static EvalStmtResult EvaluateSwitch(StmtResult &Result, EvalInfo &Info,
   }
 
   if (!Found)
-    return Scope.destroy() ? ESR_Failed : ESR_Succeeded;
+    return Scope.destroy() ? ESR_Succeeded : ESR_Failed;
 
   // Search the switch body for the switch case and evaluate it from there.
   EvalStmtResult ESR = EvaluateStmt(Result, Info, SS->getBody(), Found);
@@ -5333,9 +5336,16 @@ static bool HandleUnionActiveMemberChange(EvalInfo &Info, const Expr *LHSExpr,
       if (!FD || FD->getType()->isReferenceType())
         break;
 
-      //    ... and also contains A.B if B names a union member
-      if (FD->getParent()->isUnion())
-        UnionPathLengths.push_back({PathLength - 1, FD});
+      //    ... and also contains A.B if B names a union member ...
+      if (FD->getParent()->isUnion()) {
+        //    ... of a non-class, non-array type, or of a class type with a
+        //    trivial default constructor that is not deleted, or an array of
+        //    such types.
+        auto *RD =
+            FD->getType()->getBaseElementTypeUnsafe()->getAsCXXRecordDecl();
+        if (!RD || RD->hasTrivialDefaultConstructor())
+          UnionPathLengths.push_back({PathLength - 1, FD});
+      }
 
       E = ME->getBase();
       --PathLength;
@@ -5441,18 +5451,18 @@ static bool EvaluateArgs(ArrayRef<const Expr *> Args, ArgVector &ArgValues,
         }
     }
   }
-  for (ArrayRef<const Expr*>::iterator I = Args.begin(), E = Args.end();
-       I != E; ++I) {
-    if (!Evaluate(ArgValues[I - Args.begin()], Info, *I)) {
+  for (unsigned Idx = 0; Idx < Args.size(); Idx++) {
+    if (!Evaluate(ArgValues[Idx], Info, Args[Idx])) {
       // If we're checking for a potential constant expression, evaluate all
       // initializers even if some of them fail.
       if (!Info.noteFailure())
         return false;
       Success = false;
     } else if (!ForbiddenNullArgs.empty() &&
-               ForbiddenNullArgs[I - Args.begin()] &&
-               ArgValues[I - Args.begin()].isNullPointer()) {
-      Info.CCEDiag(*I, diag::note_non_null_attribute_failed);
+               ForbiddenNullArgs[Idx] &&
+               ArgValues[Idx].isLValue() &&
+               ArgValues[Idx].isNullPointer()) {
+      Info.CCEDiag(Args[Idx], diag::note_non_null_attribute_failed);
       if (!Info.noteFailure())
         return false;
       Success = false;
@@ -6017,6 +6027,13 @@ static bool hasVirtualDestructor(QualType T) {
     if (CXXDestructorDecl *DD = RD->getDestructor())
       return DD->isVirtual();
   return false;
+}
+
+static const FunctionDecl *getVirtualOperatorDelete(QualType T) {
+  if (CXXRecordDecl *RD = T->getAsCXXRecordDecl())
+    if (CXXDestructorDecl *DD = RD->getDestructor())
+      return DD->isVirtual() ? DD->getOperatorDelete() : nullptr;
+  return nullptr;
 }
 
 /// Check that the given object is a suitable pointer to a heap allocation that
@@ -6756,6 +6773,10 @@ public:
       return DerivedSuccess(Result, E);
     }
     }
+  }
+
+  bool VisitCXXRewrittenBinaryOperator(const CXXRewrittenBinaryOperator *E) {
+    return StmtVisitorTy::Visit(E->getSemanticForm());
   }
 
   bool VisitBinaryConditionalOperator(const BinaryConditionalOperator *E) {
@@ -9761,6 +9782,7 @@ public:
   bool VisitCXXNoexceptExpr(const CXXNoexceptExpr *E);
   bool VisitSizeOfPackExpr(const SizeOfPackExpr *E);
   bool VisitSourceLocExpr(const SourceLocExpr *E);
+  bool VisitConceptSpecializationExpr(const ConceptSpecializationExpr *E);
   // FIXME: Missing: array subscript of vector, member of vector
 };
 
@@ -10571,8 +10593,24 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     return false;
   }
 
-  case Builtin::BI__builtin_is_constant_evaluated:
+  case Builtin::BI__builtin_is_constant_evaluated: {
+    const auto *Callee = Info.CurrentCall->getCallee();
+    if (Info.InConstantContext && !Info.CheckingPotentialConstantExpression &&
+        (Info.CallStackDepth == 1 ||
+         (Info.CallStackDepth == 2 && Callee->isInStdNamespace() &&
+          Callee->getIdentifier() &&
+          Callee->getIdentifier()->isStr("is_constant_evaluated")))) {
+      // FIXME: Find a better way to avoid duplicated diagnostics.
+      if (Info.EvalStatus.Diag)
+        Info.report((Info.CallStackDepth == 1) ? E->getExprLoc()
+                                               : Info.CurrentCall->CallLoc,
+                    diag::warn_is_constant_evaluated_always_true_constexpr)
+            << (Info.CallStackDepth == 1 ? "__builtin_is_constant_evaluated"
+                                         : "std::is_constant_evaluated");
+    }
+
     return Success(Info.InConstantContext, E);
+  }
 
   case Builtin::BI__builtin_ctz:
   case Builtin::BI__builtin_ctzl:
@@ -12243,6 +12281,12 @@ bool IntExprEvaluator::VisitCXXNoexceptExpr(const CXXNoexceptExpr *E) {
   return Success(E->getValue(), E);
 }
 
+bool IntExprEvaluator::VisitConceptSpecializationExpr(
+       const ConceptSpecializationExpr *E) {
+  return Success(E->isSatisfied(), E);
+}
+
+
 bool FixedPointExprEvaluator::VisitUnaryOperator(const UnaryOperator *E) {
   switch (E->getOpcode()) {
     default:
@@ -13208,6 +13252,18 @@ bool VoidExprEvaluator::VisitCXXDeleteExpr(const CXXDeleteExpr *E) {
     return false;
   }
 
+  // For a class type with a virtual destructor, the selected operator delete
+  // is the one looked up when building the destructor.
+  if (!E->isArrayForm() && !E->isGlobalDelete()) {
+    const FunctionDecl *VirtualDelete = getVirtualOperatorDelete(AllocType);
+    if (VirtualDelete &&
+        !VirtualDelete->isReplaceableGlobalAllocationFunction()) {
+      Info.FFDiag(E, diag::note_constexpr_new_non_replaceable)
+          << isa<CXXMethodDecl>(VirtualDelete) << VirtualDelete;
+      return false;
+    }
+  }
+
   if (!HandleDestruction(Info, E->getExprLoc(), Pointer.getLValueBase(),
                          (*Alloc)->Value, AllocType))
     return false;
@@ -13550,8 +13606,8 @@ bool Expr::EvaluateAsConstantExpr(EvalResult &Result, ConstExprUsage Usage,
   if (!Info.discardCleanups())
     llvm_unreachable("Unhandled cleanup; missing full expression marker?");
 
-  return CheckConstantExpression(Info, getExprLoc(), getType(), Result.Val,
-                                 Usage) &&
+  return CheckConstantExpression(Info, getExprLoc(), getStorageType(Ctx, this),
+                                 Result.Val, Usage) &&
          CheckMemoryLeaks(Info);
 }
 
@@ -13904,6 +13960,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::CXXBoolLiteralExprClass:
   case Expr::CXXScalarValueInitExprClass:
   case Expr::TypeTraitExprClass:
+  case Expr::ConceptSpecializationExprClass:
   case Expr::ArrayTypeTraitExprClass:
   case Expr::ExpressionTraitExprClass:
   case Expr::CXXNoexceptExprClass:
@@ -13918,6 +13975,9 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
       return CheckEvalInICE(E, Ctx);
     return ICEDiag(IK_NotICE, E->getBeginLoc());
   }
+  case Expr::CXXRewrittenBinaryOperatorClass:
+    return CheckICE(cast<CXXRewrittenBinaryOperator>(E)->getSemanticForm(),
+                    Ctx);
   case Expr::DeclRefExprClass: {
     if (isa<EnumConstantDecl>(cast<DeclRefExpr>(E)->getDecl()))
       return NoDiag();
@@ -14299,27 +14359,41 @@ bool Expr::EvaluateWithSubstitution(APValue &Value, ASTContext &Ctx,
     assert(MD && "Don't provide `this` for non-methods.");
     assert(!MD->isStatic() && "Don't provide `this` for static methods.");
 #endif
-    if (EvaluateObjectArgument(Info, This, ThisVal))
+    if (!This->isValueDependent() &&
+        EvaluateObjectArgument(Info, This, ThisVal) &&
+        !Info.EvalStatus.HasSideEffects)
       ThisPtr = &ThisVal;
-    if (Info.EvalStatus.HasSideEffects)
-      return false;
+
+    // Ignore any side-effects from a failed evaluation. This is safe because
+    // they can't interfere with any other argument evaluation.
+    Info.EvalStatus.HasSideEffects = false;
   }
 
   ArgVector ArgValues(Args.size());
   for (ArrayRef<const Expr*>::iterator I = Args.begin(), E = Args.end();
        I != E; ++I) {
     if ((*I)->isValueDependent() ||
-        !Evaluate(ArgValues[I - Args.begin()], Info, *I))
+        !Evaluate(ArgValues[I - Args.begin()], Info, *I) ||
+        Info.EvalStatus.HasSideEffects)
       // If evaluation fails, throw away the argument entirely.
       ArgValues[I - Args.begin()] = APValue();
-    if (Info.EvalStatus.HasSideEffects)
-      return false;
+
+    // Ignore any side-effects from a failed evaluation. This is safe because
+    // they can't interfere with any other argument evaluation.
+    Info.EvalStatus.HasSideEffects = false;
   }
+
+  // Parameter cleanups happen in the caller and are not part of this
+  // evaluation.
+  Info.discardCleanups();
+  Info.EvalStatus.HasSideEffects = false;
 
   // Build fake call to Callee.
   CallStackFrame Frame(Info, Callee->getLocation(), Callee, ThisPtr,
                        ArgValues.data());
-  return Evaluate(Value, Info, this) && Info.discardCleanups() &&
+  // FIXME: Missing ExprWithCleanups in enable_if conditions?
+  FullExpressionRAII Scope(Info);
+  return Evaluate(Value, Info, this) && Scope.destroy() &&
          !Info.EvalStatus.HasSideEffects;
 }
 

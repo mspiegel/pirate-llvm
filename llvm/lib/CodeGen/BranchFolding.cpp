@@ -162,6 +162,11 @@ void BranchFolder::RemoveDeadBlock(MachineBasicBlock *MBB) {
   // Avoid matching if this pointer gets reused.
   TriedMerging.erase(MBB);
 
+  // Update call site info.
+  std::for_each(MBB->begin(), MBB->end(), [MF](const MachineInstr &MI) {
+    if (MI.isCall(MachineInstr::IgnoreBundle))
+      MF->eraseCallSiteInfo(&MI);
+  });
   // Remove the block.
   MF->erase(MBB);
   EHScopeMembership.erase(MBB);
@@ -397,11 +402,12 @@ SkipTopCFIAndReturn:
   // the CFI instruction. Later on, this leads to BB2 being 'hacked off' at the
   // wrong place (in ReplaceTailWithBranchTo()) which results in losing this CFI
   // instruction.
-  while (I1 != MBB1->end() && I1->isCFIInstruction()) {
+  // Skip CFI_INSTRUCTION and debugging instruction; necessary to avoid changing the code.
+  while (I1 != MBB1->end() && !countsAsInstruction(*I1)) {
     ++I1;
   }
 
-  while (I2 != MBB2->end() && I2->isCFIInstruction()) {
+  while (I2 != MBB2->end() && !countsAsInstruction(*I2)) {
     ++I2;
   }
 
@@ -1307,6 +1313,8 @@ static bool IsBranchOnlyBlock(MachineBasicBlock *MBB) {
 /// result in infinite loops.
 static bool IsBetterFallthrough(MachineBasicBlock *MBB1,
                                 MachineBasicBlock *MBB2) {
+  assert(MBB1 && MBB2 && "Unknown MachineBasicBlock");
+
   // Right now, we use a simple heuristic.  If MBB2 ends with a call, and
   // MBB1 doesn't, we prefer to fall through into MBB1.  This allows us to
   // optimize branches that branch to either a return block or an assert block

@@ -367,7 +367,7 @@ tweakSelection(const Range &Sel, const InputsAndAST &AST) {
   auto End = positionToOffset(AST.Inputs.Contents, Sel.end);
   if (!End)
     return End.takeError();
-  return Tweak::Selection(AST.AST, *Begin, *End);
+  return Tweak::Selection(AST.Inputs.Index, AST.AST, *Begin, *End);
 }
 
 void ClangdServer::enumerateTweaks(PathRef File, Range Sel,
@@ -460,7 +460,7 @@ void ClangdServer::switchSourceHeader(
   if (auto CorrespondingFile =
           getCorrespondingHeaderOrSource(Path, FSProvider.getFileSystem()))
     return CB(std::move(CorrespondingFile));
-  auto Action = [Path, CB = std::move(CB),
+  auto Action = [Path = Path.str(), CB = std::move(CB),
                  this](llvm::Expected<InputsAndAST> InpAST) mutable {
     if (!InpAST)
       return CB(InpAST.takeError());
