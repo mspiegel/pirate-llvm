@@ -1305,7 +1305,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   if (CapabilitiesSection) {
     uint64_t SecStart = W.OS.tell();
 
-    // first entry is used for the absense of capabilities
+    // First entry defined to be CAP_NULL
     W.write<uint64_t>(0);
     W.write<uint64_t>(0);
 
@@ -1321,6 +1321,10 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
   if (EnclavesSection) {
     uint64_t SecStart = W.OS.tell();
+
+    // First entry defined to be ENC_UNDEF
+    W.write<uint64_t>(0);
+    W.write<uint64_t>(0);
 
     for (auto const &entry : Asm.PartitionEnclaves) {
       
