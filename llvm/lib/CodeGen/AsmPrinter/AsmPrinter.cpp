@@ -1390,35 +1390,79 @@ void AsmPrinter::emitRemarksSection(Module &M) {
 
 void AsmPrinter::emitGapsSections(Module &M) {
 
-  std::vector<std::pair<StringRef, StringRef>>
-      PartitionCapabilities; // Capability/Sensitivity, parent
-  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>>
-      PartitionEnclaves;
-  std::vector<std::tuple<StringRef, std::vector<StringRef>, const MCSymbol *>>
-      PartitionRequirements;
+  std::unordered_map<
+    std::string, 
+    std::tuple<StringRef,
+               MCSymbol*,
+               std::vector<StringRef>>> enclaves;
 
-  for (auto const& f : M) {
-    if (f.hasFnAttribute("enclave_only")) {
-      OutStreamer->emitEnclaveRequirement(
-        getSymbol(&f),
-        f.getFnAttribute("enclave_only").getValueAsString(),
-        std::vector<StringRef>()
-      );
-    }
-    if (f.hasFnAttribute("enclave_main")) {
-      OutStreamer->emitEnclaveEntry(
-        getSymbol(&f), 
-        f.getFnAttribute("enclave_main").getValueAsString(),
-        std::vector<StringRef>()
-      );
+  std::unordered_map<
+    std::string, 
+    std::pair<StringRef, StringRef>> capabilities;
+
+  std::unordered_map<MCSymbol*,
+    std::pair<StringRef,
+              std::vector<StringRef>>> requirements;
+
+  NamedMDNode* enclavesMD = M.getNamedMetadata("gaps.enclaves");
+  NamedMDNode* capabilitiesMD = M.getNamedMetadata("gaps.capabilities");
+  NamedMDNode* enclaveCapabilitiesMD = M.getNamedMetadata("gaps.enclave_capabilities");
+
+  for (llvm::MDNode* e : enclavesMD->operands()) {
+    auto name = cast<MDString>(e->getOperand(0).get())->getString();
+    enclaves[name.str()] = std::make_tuple<StringRef, MCSymbol*, std::vector<StringRef>>
+      (StringRef(name), nullptr, {});
+  }
+
+  for (llvm::MDNode* e : capabilitiesMD->operands()) {
+    auto name = cast<MDString>(e->getOperand(0).get())->getString();
+
+    if (e->getNumOperands() == 2) {
+      auto parent = cast<MDString>(e->getOperand(1).get())->getString().str();
+      capabilities[name.str()] = std::make_pair(name, parent);
+    } else {
+      capabilities[name.str()] = std::make_pair(name, "");
     }
   }
 
-  // XXX: Test data
-  OutStreamer->emitCapability("low", "");
-  OutStreamer->emitCapability("high", "low");
-  OutStreamer->emitCapability("sensor", "");
-  OutStreamer->emitCapability("network", "");
+  for (llvm::MDNode* e : enclaveCapabilitiesMD->operands()) {
+    auto enclave = cast<MDString>(e->getOperand(0).get())->getString();
+    auto capability = cast<MDString>(e->getOperand(1).get())->getString();
+
+    std::get<2>(enclaves[enclave.str()]).push_back(capability);
+  }
+
+  for (auto const& f : M) {
+    if (f.hasFnAttribute("enclave_only")) {
+      auto enclave = f.getFnAttribute("enclave_only").getValueAsString().str();
+      std::get<1>(enclaves[enclave]) = getSymbol(&f);
+    }
+
+    if (f.hasFnAttribute("enclave_main")) {
+      auto enclave = f.getFnAttribute("enclave_main").getValueAsString().str();
+      requirements[getSymbol(&f)].first = enclave;
+    }
+  }
+
+  for (auto const& x : enclaves) {
+    OutStreamer->emitEnclaveEntry(
+        std::get<1>(x.second),
+        std::get<0>(x.second),
+        std::get<2>(x.second)
+      );
+  }
+
+  for (auto const& x : capabilities) {
+    OutStreamer->emitCapability(x.second.first, x.second.second);
+  }
+
+  for (auto const& x : requirements) {
+    OutStreamer->emitEnclaveRequirement(
+      x.first,
+      x.second.first,
+      x.second.second
+      );
+  }
 }
 
 bool AsmPrinter::doFinalization(Module &M) {
