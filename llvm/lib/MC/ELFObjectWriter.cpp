@@ -1184,7 +1184,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   MCSectionELF *CapabilitiesSection = nullptr;
   if (!Asm.PartitionCapabilities.empty()) {
     CapabilitiesSection = Ctx.getELFSection(".gaps.capabilities",
-                                         ELF::SHT_LLVM_PART_CAPS,
+                                         ELF::SHT_PROGBITS,
                                          0, 16, "");
     SectionIndexMap[CapabilitiesSection] = addToSectionTable(CapabilitiesSection);
 
@@ -1199,7 +1199,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   MCSectionELF *EnclavesSection = nullptr;
   if (!Asm.PartitionEnclaves.empty()) {
     EnclavesSection = Ctx.getELFSection(".gaps.enclaves",
-                                         ELF::SHT_LLVM_PART_ENTR,
+                                         ELF::SHT_PROGBITS,
                                          0, 16, ""); // XXX: Fix length
     SectionIndexMap[EnclavesSection] = addToSectionTable(EnclavesSection);
 
@@ -1216,22 +1216,22 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   MCSectionELF *RequirementsSection = nullptr;
   if (!Asm.PartitionRequirements.empty()) {
     RequirementsSection = Ctx.getELFSection(".gaps.symreqs",
-                                         ELF::SHT_LLVM_PART_REQS,
-                                         0, 24, "");
+                                         ELF::SHT_PROGBITS,
+                                         0, 16, "");
     SectionIndexMap[RequirementsSection] = addToSectionTable(RequirementsSection);
   }
 
   MCSectionELF *CapsTabSection = nullptr;
   if (!Asm.PartitionRequirements.empty() || !Asm.PartitionEnclaves.empty()) {
     CapsTabSection = Ctx.getELFSection(".gaps.captab",
-                                         ELF::SHT_LLVM_PART_CAPSTAB,
-                                         0, 8, "");
+                                         ELF::SHT_PROGBITS,
+                                         0, 2, "");
     SectionIndexMap[CapsTabSection] = addToSectionTable(CapsTabSection);
   }
 
   MCSectionELF *CapStrTabSection = nullptr;
   if (!Asm.PartitionCapabilities.empty()) {
-    CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_LLVM_PART_STRTAB, 0);
+    CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_PROGBITS, 0, 16, "");
     SectionIndexMap[CapStrTabSection] = addToSectionTable(CapStrTabSection);
   }
 
@@ -1373,7 +1373,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
         capstab.push_back(0); // list terminator
       }
 
-      W.write<uint32_t>(capability_ids[name.str()]); // req_enc
+      W.write<uint32_t>(enclave_ids[name.str()]); // req_enc
 
       W.write<uint16_t>(symbol ? symbol->getIndex() : 0); // req_sym
       W.write<uint16_t>(0); // req_padding
