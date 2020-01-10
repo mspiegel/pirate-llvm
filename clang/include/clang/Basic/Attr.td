@@ -3429,17 +3429,23 @@ def NoBuiltin : Attr {
   let Documentation = [NoBuiltinDocs];
 }
 
-def EnclaveOnly : InheritableAttr {
-  let Spellings = [Clang<"enclave_only">];
+def GapsEnclaveOnly : InheritableAttr {
+  let Spellings = [Clang<"gaps_enclave_only">];
   let Subjects = SubjectList<[Function, GlobalVar]>;
-  let Documentation = [EnclaveOnlyDocs];
+  let Documentation = [GapsEnclaveOnlyDocs];
   let Args = [StringArgument<"EnclaveName">];
 }
 
-def EnclaveMain : InheritableAttr {
-  let Spellings = [Clang<"enclave_main">];
+def GapsEnclaveMain : InheritableAttr {
+  let Spellings = [Clang<"gaps_enclave_main">];
   let Subjects = SubjectList<[Function, GlobalVar]>;
-  let Documentation = [EnclaveMainDocs];
+  let Documentation = [GapsEnclaveMainDocs];
   let Args = [StringArgument<"EnclaveName">];
 }
 
+def GapsCapability : InheritableAttr {
+  let Spellings = [Clang<"gaps_capability">];
+  let Subjects = SubjectList<[Function, GlobalVar]>;
+  let Documentation = [GapsCapabilityDocs];
+  let Args = [StringArgument<"Capability">];
+}

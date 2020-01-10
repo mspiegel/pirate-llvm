@@ -1214,12 +1214,16 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
   FunctionArgList Args;
   QualType ResTy = BuildFunctionArgList(GD, Args);
 
-  if (FD->hasAttr<EnclaveMainAttr>()) {
-    Fn->addFnAttr("enclave_main",FD->getAttr<EnclaveMainAttr>()->getEnclaveName());
+  if (FD->hasAttr<GapsEnclaveMainAttr>()) {
+    Fn->addFnAttr("gaps_enclave_main",FD->getAttr<GapsEnclaveMainAttr>()->getEnclaveName());
   }
 
-  if (FD->hasAttr<EnclaveOnlyAttr>()) {
-    Fn->addFnAttr("enclave_only",FD->getAttr<EnclaveOnlyAttr>()->getEnclaveName());
+  if (FD->hasAttr<GapsEnclaveOnlyAttr>()) {
+    Fn->addFnAttr("gaps_enclave_only",FD->getAttr<GapsEnclaveOnlyAttr>()->getEnclaveName());
+  }
+
+  if (FD->hasAttr<GapsEnclaveOnlyAttr>()) {
+    Fn->addFnAttr("gaps_capability",FD->getAttr<GapsCapabilityAttr>()->getCapability());
   }
 
   // Check if we should generate debug info for this function.

@@ -4453,18 +4453,26 @@ once.
   }];
 }
 
-def EnclaveMainDocs : Documentation {
+def GapsEnclaveMainDocs : Documentation {
   let Category = DocCatFunction;
-  let Heading = "enclave_main";
+  let Heading = "gaps_enclave_main";
   let Content = [{
   Mark the entry point for an enclave.
   }];
 }
 
-def EnclaveOnlyDocs : Documentation {
+def GapsEnclaveOnlyDocs : Documentation {
   let Category = DocCatFunction;
-  let Heading = "enclave_only";
+  let Heading = "gaps_enclave_only";
   let Content = [{
   Mark a declaration that only appears in a particular enclave.
+  }];
+}
+
+def GapsCapabilityDocs : Documentation {
+  let Category = DocCatFunction;
+  let Heading = "gaps_capability";
+  let Content = [{
+  Mark a declaration that requires an enclave with a particular capability.
   }];
 }

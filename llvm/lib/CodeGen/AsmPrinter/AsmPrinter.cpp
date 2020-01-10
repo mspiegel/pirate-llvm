@@ -1428,14 +1428,19 @@ void AsmPrinter::emitGapsSections(Module &M) {
   }
 
   for (auto const& f : M) {
-    if (f.hasFnAttribute("enclave_main")) {
-      auto enclave = f.getFnAttribute("enclave_main").getValueAsString().str();
+    if (f.hasFnAttribute("gaps_enclave_main")) {
+      auto enclave = f.getFnAttribute("gaps_enclave_main").getValueAsString().str();
       std::get<1>(enclaves[enclave]) = getSymbol(&f);
     }
 
-    if (f.hasFnAttribute("enclave_only")) {
-      auto enclave = f.getFnAttribute("enclave_only").getValueAsString();
+    if (f.hasFnAttribute("gaps_enclave_only")) {
+      auto enclave = f.getFnAttribute("gaps_enclave_only").getValueAsString();
       requirements[getSymbol(&f)].first = enclave;
+    }
+
+    if (f.hasFnAttribute("gaps_capability")) {
+      auto capability = f.getFnAttribute("gaps_capability").getValueAsString();
+      requirements[getSymbol(&f)].second.push_back(capability);
     }
   }
 

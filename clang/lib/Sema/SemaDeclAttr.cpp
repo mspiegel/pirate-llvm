@@ -1917,24 +1917,34 @@ static void handleTLSModelAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   D->addAttr(::new (S.Context) TLSModelAttr(S.Context, AL, Model));
 }
 
-static void handleEnclaveOnlyAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+static void handleGapsEnclaveOnlyAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   StringRef Name;
   SourceLocation LiteralLoc;
   // Check that it is a string.
   if (!S.checkStringLiteralArgumentAttr(AL, 0, Name, &LiteralLoc))
     return;
 
-  D->addAttr(::new (S.Context) EnclaveOnlyAttr(S.Context, AL, Name));
+  D->addAttr(::new (S.Context) GapsEnclaveOnlyAttr(S.Context, AL, Name));
 }
 
-static void handleEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+static void handleGapsEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   StringRef Name;
   SourceLocation LiteralLoc;
   // Check that it is a string.
   if (!S.checkStringLiteralArgumentAttr(AL, 0, Name, &LiteralLoc))
     return;
 
-  D->addAttr(::new (S.Context) EnclaveMainAttr(S.Context, AL, Name));
+  D->addAttr(::new (S.Context) GapsEnclaveMainAttr(S.Context, AL, Name));
+}
+
+static void handleGapsCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  StringRef Name;
+  SourceLocation LiteralLoc;
+  // Check that it is a string.
+  if (!S.checkStringLiteralArgumentAttr(AL, 0, Name, &LiteralLoc))
+    return;
+
+  D->addAttr(::new (S.Context) GapsCapabilityAttr(S.Context, AL, Name));
 }
 
 static void handleRestrictAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
@@ -7268,12 +7278,16 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     handleArmMveAliasAttr(S, D, AL);
     break;
 
-  case ParsedAttr::AT_EnclaveOnly:
-    handleEnclaveOnlyAttr(S, D, AL);
+  case ParsedAttr::AT_GapsEnclaveOnly:
+    handleGapsEnclaveOnlyAttr(S, D, AL);
     break;
 
-  case ParsedAttr::AT_EnclaveMain:
-    handleEnclaveMainAttr(S, D, AL);
+  case ParsedAttr::AT_GapsEnclaveMain:
+    handleGapsEnclaveMainAttr(S, D, AL);
+    break;
+
+  case ParsedAttr::AT_GapsCapability:
+    handleGapsCapabilityAttr(S, D, AL);
     break;
   }
 }

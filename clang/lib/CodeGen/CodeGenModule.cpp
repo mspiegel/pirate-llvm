@@ -1484,14 +1484,19 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
                                                            llvm::Function *F) {
   llvm::AttrBuilder B;
   
-  if (F->hasFnAttribute("enclave_only")) {
-    auto attr = F->getFnAttribute("enclave_only");
-    B.addAttribute("enclave_only", attr.getValueAsString());
+  if (F->hasFnAttribute("gaps_enclave_only")) {
+    auto attr = F->getFnAttribute("gaps_enclave_only");
+    B.addAttribute("gaps_enclave_only", attr.getValueAsString());
   }
 
-  if (F->hasFnAttribute("enclave_main")) {
-    auto attr = F->getFnAttribute("enclave_main");
-    B.addAttribute("enclave_main", attr.getValueAsString());
+  if (F->hasFnAttribute("gaps_enclave_main")) {
+    auto attr = F->getFnAttribute("gaps_enclave_main");
+    B.addAttribute("gaps_enclave_main", attr.getValueAsString());
+  }
+
+  if (F->hasFnAttribute("gaps_capability")) {
+    auto attr = F->getFnAttribute("gaps_capability");
+    B.addAttribute("gaps_capability", attr.getValueAsString());
   }
 
   if (CodeGenOpts.UnwindTables)
