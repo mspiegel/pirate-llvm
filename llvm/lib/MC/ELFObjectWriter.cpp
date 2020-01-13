@@ -1186,6 +1186,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     CapabilitiesSection = Ctx.getELFSection(".gaps.capabilities",
                                          ELF::SHT_PROGBITS,
                                          0, 16, "");
+    CapabilitiesSection->setAlignment(Align(8));
     SectionIndexMap[CapabilitiesSection] = addToSectionTable(CapabilitiesSection);
 
     size_t i = 0;
@@ -1201,6 +1202,8 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     EnclavesSection = Ctx.getELFSection(".gaps.enclaves",
                                          ELF::SHT_PROGBITS,
                                          0, 16, ""); // XXX: Fix length
+    EnclavesSection->setAlignment(Align(8));
+
     SectionIndexMap[EnclavesSection] = addToSectionTable(EnclavesSection);
 
     size_t i = 0;
@@ -1217,7 +1220,8 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   if (!Asm.PartitionRequirements.empty()) {
     RequirementsSection = Ctx.getELFSection(".gaps.symreqs",
                                          ELF::SHT_PROGBITS,
-                                         0, 16, "");
+                                         0, 12, "");
+    RequirementsSection->setAlignment(Align(4));
     SectionIndexMap[RequirementsSection] = addToSectionTable(RequirementsSection);
   }
 
@@ -1225,13 +1229,15 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   if (!Asm.PartitionRequirements.empty() || !Asm.PartitionEnclaves.empty()) {
     CapsTabSection = Ctx.getELFSection(".gaps.captab",
                                          ELF::SHT_PROGBITS,
-                                         0, 2, "");
+                                         0, 4, "");
+    CapsTabSection->setAlignment(Align(4));                             
+
     SectionIndexMap[CapsTabSection] = addToSectionTable(CapsTabSection);
   }
 
   MCSectionELF *CapStrTabSection = nullptr;
   if (!Asm.PartitionCapabilities.empty()) {
-    CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_PROGBITS, 0, 16, "");
+    CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_PROGBITS, 0, 1, "");
     SectionIndexMap[CapStrTabSection] = addToSectionTable(CapStrTabSection);
   }
 
@@ -1303,6 +1309,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     SectionOffsets[CGProfileSection] = std::make_pair(SecStart, SecEnd);
   }
   if (CapabilitiesSection) {
+    align(CapabilitiesSection->getAlignment());
     uint64_t SecStart = W.OS.tell();
 
     // First entry defined to be CAP_NULL
@@ -1320,6 +1327,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   }
 
   if (EnclavesSection) {
+    align(EnclavesSection->getAlignment());
     uint64_t SecStart = W.OS.tell();
 
     // First entry defined to be ENC_UNDEF
@@ -1346,14 +1354,15 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
       }
 
       W.write<uint16_t>(symbol ? symbol->getIndex() : 0); // .enc_entry
-      W.write<uint16_t>(0);
+      W.write<uint16_t>(0); // .enc_padding
     }
-    
+
     uint64_t SecEnd = W.OS.tell();
     SectionOffsets[EnclavesSection] = std::make_pair(SecStart, SecEnd);
   }
 
   if (RequirementsSection) {
+    align(RequirementsSection->getAlignment());
     uint64_t SecStart = W.OS.tell();
 
     for (auto const &entry : Asm.PartitionRequirements) {
@@ -1384,6 +1393,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   }
 
   if (CapsTabSection) {
+    align(CapsTabSection->getAlignment());
     uint64_t SecStart = W.OS.tell();
 
     for (auto entry : capstab) {
