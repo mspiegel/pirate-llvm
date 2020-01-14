@@ -1223,7 +1223,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   }
 
   MCSectionELF *CapStrTabSection = nullptr;
-  if (!Asm.PartitionCapabilities.empty()) {
+  if (capstrtab.getSize() > 0) {
     CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_PROGBITS, 0, 1, "");
     SectionIndexMap[CapStrTabSection] = addToSectionTable(CapStrTabSection);
   }
@@ -1391,7 +1391,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     SectionOffsets[CapsTabSection] = std::make_pair(SecStart, SecEnd);
   }
 
-  {
+  if (CapStrTabSection) {
     uint64_t SecStart = W.OS.tell();
     capstrtab.write(W.OS);
     uint64_t SecEnd = W.OS.tell();
