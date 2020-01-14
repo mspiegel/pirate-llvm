@@ -202,12 +202,6 @@ public:
                           const RevGroupMapTy &RevGroupMap,
                           SectionOffsetsTy &SectionOffsets);
 
-  void writePartitionSections(
-    MCAssembler &Asm, const MCAsmLayout &Layout,
-    const SectionIndexMapTy &SectionIndexMap,
-    const RevGroupMapTy &RevGroupMap,
-    SectionOffsetsTy &SectionOffsets);
-
   void writeAddrsigSection();
 
   MCSectionELF *createRelocationSection(MCContext &Ctx,
@@ -632,13 +626,6 @@ bool ELFWriter::isInSymtab(const MCAsmLayout &Layout, const MCSymbolELF &Symbol,
     return false;
 
   return true;
-}
-
-void ELFWriter::writePartitionSections(
-    MCAssembler &Asm, const MCAsmLayout &Layout,
-    const SectionIndexMapTy &SectionIndexMap, const RevGroupMapTy &RevGroupMap,
-    SectionOffsetsTy &SectionOffsets)
-{
 }
 
 void ELFWriter::computeSymbolTable(
@@ -1208,7 +1195,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
     size_t i = 0;
     for (auto const& entry : Asm.PartitionEnclaves) {
-      std::string name = std::get<0>(entry);
+      StringRef name = std::get<0>(entry);
       enclave_ids[name] = ++i;
       capstrtab.add(name);
     }
