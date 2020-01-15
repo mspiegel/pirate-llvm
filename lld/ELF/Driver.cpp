@@ -1587,7 +1587,7 @@ static Symbol *addUndefined(StringRef name) {
 }
 
 template <typename ELFT>
-static void readGapsSection(InputSectionBase *s) {
+static bool readGapsSection(InputSectionBase *s) {
   if (s->name == ".gaps.enclaves")
     s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>();
   else if (s->name == ".gaps.symreqs")
@@ -1598,6 +1598,10 @@ static void readGapsSection(InputSectionBase *s) {
     s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
   else if (s->name == ".gaps.strtab")
     s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
+  else
+    return false;
+
+  return true;
 }
 
 // This function is where all the optimizations of link-time
@@ -2007,10 +2011,8 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
     }
 
     // Handle GAPS sections
-    if (!config->enclave.empty() && s->name.startswith(".gaps")) {
-      readGapsSection<ELFT>(s);
-      return true;
-    }
+    if (!config->enclave.empty() && s->name.startswith(".gaps"))
+      return readGapsSection<ELFT>(s);
 
     // We do not want to emit debug sections if --strip-all
     // or -strip-debug are given.
