@@ -1097,6 +1097,9 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("__GLIBCXX_BITSIZE_INT_N_0", "128");
   }
 
+  // Declare support for GAPS enclaves
+  Builder.defineMacro("__GAPS__");
+
   // Get other target #defines.
   TI.getTargetDefines(LangOpts, Builder);
 }
