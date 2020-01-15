@@ -1950,19 +1950,26 @@ template <class ELFT> void ELFDumper<ELFT>::printStackSizes() {
   ELFDumperStyle->printStackSizes(ObjF);
 }
 
-template <class ELFT> void ELFDumper<ELFT>::printGapsInfo() {
+template <class ELFT, typename T>
+ArrayRef<T> mkArray(const object::ELFObjectFile<ELFT> *ObjF,
+    const typename ELFT::Shdr *Shdr) {
   const ELFFile<ELFT> *Obj = ObjF->getELFFile();
+
+  if(Shdr)
+    return unwrapOrError(ObjF->getFileName(),
+        Obj->template getSectionContentsAsArray<T>(Shdr));
+  else
+    return {(T *)NULL, (size_t)0};
+}
+
+template <class ELFT> void ELFDumper<ELFT>::printGapsInfo() {
   Elf_GAPS_Impl<ELFT> Gaps;
-  Gaps.enclaves = unwrapOrError(ObjF->getFileName(),
-      Obj->template getSectionContentsAsArray<Elf_GAPS_enc<ELFT>>(GapsEnclavesSec));
-  Gaps.capabilities = unwrapOrError(ObjF->getFileName(),
-      Obj->template getSectionContentsAsArray<Elf_GAPS_cap<ELFT>>(GapsCapabilitiesSec));
-  Gaps.symreqs = unwrapOrError(ObjF->getFileName(),
-      Obj->template getSectionContentsAsArray<Elf_GAPS_req<ELFT>>(GapsSymreqsSec));
-  Gaps.captab = unwrapOrError(ObjF->getFileName(),
-      Obj->template getSectionContentsAsArray<uint32_t>(GapsCaptabSec));
-  Gaps.strtab = unwrapOrError(ObjF->getFileName(),
-      Obj->template getSectionContentsAsArray<char>(GapsStrtabSec));
+
+  Gaps.enclaves = mkArray<ELFT,Elf_GAPS_enc<ELFT>>(ObjF, GapsEnclavesSec);
+  Gaps.capabilities = mkArray<ELFT,Elf_GAPS_cap<ELFT>>(ObjF, GapsCapabilitiesSec);
+  Gaps.symreqs = mkArray<ELFT,Elf_GAPS_req<ELFT>>(ObjF, GapsSymreqsSec);
+  Gaps.captab = mkArray<ELFT,uint32_t>(ObjF, GapsCaptabSec);
+  Gaps.strtab = mkArray<ELFT,char>(ObjF, GapsStrtabSec);
 
   ELFDumperStyle->printGapsInfo(ObjF, Gaps);
 }
@@ -2234,7 +2241,7 @@ template <class ELFT> void ELFDumper<ELFT>::printUnwindInfo() {
   Ctx.printUnwindInformation();
 }
 
-namespace {
+ namespace {
 
 template <> void ELFDumper<ELF32LE>::printUnwindInfo() {
   const ELFFile<ELF32LE> *Obj = ObjF->getELFFile();
@@ -5195,21 +5202,21 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
   };
 
   if (Gaps.enclaves.empty()) {
-    OS << "There are no GAPS enclaves in this file";
+    OS << "There are no GAPS enclaves in this file\n";
   } else {
     PrintEnclavesHeader();
     for (const Elf_GAPS_enc<ELFT> &Enc : Gaps.enclaves)
       PrintEnclave(Enc);
   }
   if (Gaps.symreqs.empty()) {
-    OS << "There are no GAPS symbol requirements in this file";
+    OS << "There are no GAPS symbol requirements in this file\n";
   } else {
     PrintSymreqsHeader();
     for (const Elf_GAPS_req<ELFT> &Req : Gaps.symreqs)
       PrintSymreq(Req);
   }
   if (Gaps.capabilities.empty()) {
-    OS << "There are no GAPS capabilities in this file";
+    OS << "There are no GAPS capabilities in this file\n";
   } else {
     PrintCapsHeader();
     for (const Elf_GAPS_cap<ELFT> &Cap : Gaps.capabilities)
