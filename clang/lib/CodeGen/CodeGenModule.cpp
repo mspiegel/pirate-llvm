@@ -1483,21 +1483,6 @@ CodeGenModule::getMostBaseClasses(const CXXRecordDecl *RD) {
 void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
                                                            llvm::Function *F) {
   llvm::AttrBuilder B;
-  
-  if (F->hasFnAttribute("gaps_enclave_only")) {
-    auto attr = F->getFnAttribute("gaps_enclave_only");
-    B.addAttribute("gaps_enclave_only", attr.getValueAsString());
-  }
-
-  if (F->hasFnAttribute("gaps_enclave_main")) {
-    auto attr = F->getFnAttribute("gaps_enclave_main");
-    B.addAttribute("gaps_enclave_main", attr.getValueAsString());
-  }
-
-  if (F->hasFnAttribute("gaps_capability")) {
-    auto attr = F->getFnAttribute("gaps_capability");
-    B.addAttribute("gaps_capability", attr.getValueAsString());
-  }
 
   if (CodeGenOpts.UnwindTables)
     B.addAttribute(llvm::Attribute::UWTable);
@@ -3995,6 +3980,18 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
   }
 
   MaybeHandleStaticInExternC(D, GV);
+
+  if (D->hasAttr<GapsCapabilityAttr>()) {
+    GV->addAttribute(
+      "gaps_capability",
+      D->getAttr<GapsCapabilityAttr>()->getCapability());
+  }
+
+  if (D->hasAttr<GapsEnclaveOnlyAttr>()) {
+    GV->addAttribute(
+      "gaps_enclave_only",
+      D->getAttr<GapsEnclaveOnlyAttr>()->getEnclaveName());
+  }
 
   if (D->hasAttr<AnnotateAttr>())
     AddGlobalAnnotations(D, GV);

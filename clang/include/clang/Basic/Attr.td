@@ -3438,7 +3438,7 @@ def GapsEnclaveOnly : InheritableAttr {
 
 def GapsEnclaveMain : InheritableAttr {
   let Spellings = [Clang<"gaps_enclave_main">];
-  let Subjects = SubjectList<[Function, GlobalVar]>;
+  let Subjects = SubjectList<[Function]>;
   let Documentation = [GapsEnclaveMainDocs];
   let Args = [StringArgument<"EnclaveName">];
 }

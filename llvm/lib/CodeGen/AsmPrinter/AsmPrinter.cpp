@@ -129,7 +129,6 @@
 #include <utility>
 #include <vector>
 #include <unordered_map>
-#include <iostream>
 
 using namespace llvm;
 
@@ -1427,7 +1426,7 @@ void AsmPrinter::emitGapsSections(Module &M) {
     std::get<2>(enclaves[enclave.str()]).push_back(capability);
   }
 
-  for (auto const& f : M) {
+  for (auto const& f : M.functions()) {
     if (f.hasFnAttribute("gaps_enclave_main")) {
       auto enclave = f.getFnAttribute("gaps_enclave_main").getValueAsString().str();
       std::get<1>(enclaves[enclave]) = getSymbol(&f);
@@ -1441,6 +1440,19 @@ void AsmPrinter::emitGapsSections(Module &M) {
     if (f.hasFnAttribute("gaps_capability")) {
       auto capability = f.getFnAttribute("gaps_capability").getValueAsString();
       requirements[getSymbol(&f)].second.push_back(capability);
+    }
+  }
+
+  for (auto const& d : M.globals()) {
+
+    if (d.hasAttribute("gaps_enclave_only")) {
+      auto enclave = d.getAttribute("gaps_enclave_only").getValueAsString();
+      requirements[getSymbol(&d)].first = enclave;
+    }
+
+    if (d.hasAttribute("gaps_capability")) {
+      auto capability = d.getAttribute("gaps_capability").getValueAsString();
+      requirements[getSymbol(&d)].second.push_back(capability);
     }
   }
 
