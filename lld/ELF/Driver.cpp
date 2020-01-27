@@ -1587,25 +1587,21 @@ static Symbol *addUndefined(StringRef name) {
 }
 
 template <typename ELFT>
-static void readGapsSection(InputSectionBase *s) {
-  if (s->name == ".gaps.enclaves") {
-    warn("<><><> Found .gaps.enclaves with size " + std::to_string(s->data().size())
-        + " in file " + s->getFile<ELFT>()->getName());
+static bool readGapsSection(InputSectionBase *s) {
+  if (s->name == ".gaps.enclaves")
     s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>();
-    warn("<><><> It has " + std::to_string(s->getFile<ELFT>()->gaps.enclaves.size()) + " entries");
-  } else if (s->name == ".gaps.symreqs") {
-    warn("<><><> Found .gaps.symreqs");
+  else if (s->name == ".gaps.symreqs")
     s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>();
-  } else if (s->name == ".gaps.capabilities") {
-    warn("<><><> Found .gaps.capabilities");
+  else if (s->name == ".gaps.capabilities")
     s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>();
-  } else if (s->name == ".gaps.captab") {
-    warn("<><><> Found .gaps.captab");
+  else if (s->name == ".gaps.captab")
     s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
-  } else if (s->name == ".gaps.strtab") {
-    warn("<><><> Found .gaps.strtab");
+  else if (s->name == ".gaps.strtab")
     s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
-  }
+  else
+    return false;
+
+  return true;
 }
 
 // This function is where all the optimizations of link-time
@@ -1742,19 +1738,14 @@ template <class ELFT> static uint32_t getAndFeatures() {
 template <typename ELFT>
 void processGapsEnclave() {
   for (InputFile *f_ : objectFiles) {
-    warn("<><><> Processing file " + f_->getName());
     auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
     if (!f)
       continue;
-    warn("<><><> It's an ObjFile!");
 
-    warn("<><><> Found " + std::to_string(f->gaps.enclaves.size()) + " enclaves");
     for (auto e = f->gaps.enclaves.begin() + 1; e < f->gaps.enclaves.end(); ++e) {
       StringRef name = f->gaps.getStrtabEntry(e->enc_name);
 
-      warn("<><><> Found enclave named " + name);
       if (name.equals(config->enclave)) {
-        warn(StringRef("<><><> ") + (enclave ? "Enclave already defined" : "Allocating new enclave"));
         enclave = enclave ? enclave : new Enclave(config->enclave);
 
         if (enclave->main && e->enc_main)
@@ -1773,11 +1764,9 @@ void processGapsEnclave() {
 template <typename ELFT>
 void processGapsRequirements() {
   for (InputFile *f_ : objectFiles) {
-    warn("<><><> Processing file " + f_->getName());
     auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
     if (!f)
       continue;
-    warn("<><><> It's an ObjFile!");
 
     for (auto r = f->gaps.symreqs.begin(); r < f->gaps.symreqs.end(); ++r) {
       std::vector<StringRef> caps;
@@ -2022,10 +2011,8 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
     }
 
     // Handle GAPS sections
-    if (!config->enclave.empty() && s->name.startswith(".gaps")) {
-      readGapsSection<ELFT>(s);
-      return true;
-    }
+    if (!config->enclave.empty() && s->name.startswith(".gaps"))
+      return readGapsSection<ELFT>(s);
 
     // We do not want to emit debug sections if --strip-all
     // or -strip-debug are given.
