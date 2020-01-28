@@ -1412,7 +1412,8 @@ void AsmPrinter::emitGapsSections(Module &M) {
     auto name = cast<MDString>(e->getOperand(0).get())->getString();
 
     if (e->getNumOperands() == 2) {
-      auto parent = cast<MDString>(e->getOperand(1).get())->getString().str();
+      auto parent = cast<MDString>(e->getOperand(1).get())->getString();
+
       capabilities[name.str()] = std::make_pair(name, parent);
     } else {
       capabilities[name.str()] = std::make_pair(name, "");
