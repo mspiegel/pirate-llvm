@@ -3365,7 +3365,7 @@ void PragmaCapabilityHandler::HandlePragma(
   if (command == "declare" && args.size() == 1) {
     Actions.ActOnPragmaDeclareCapability(args[0]);
   } else if (command == "declare" && args.size() == 2) {
-    Actions.ActOnPragmaDeclareCapability(args[0], args[1]);
+    Actions.ActOnPragmaDeclareCapability(PragmaLoc, args[0], args[1]);
   } else {
     PP.Diag(PragmaLoc, diag::warn_pragma_capability);
     return;
@@ -3432,7 +3432,7 @@ void PragmaEnclaveHandler::HandlePragma(
   if (command == "declare" && args.size() == 1) {
     Actions.ActOnPragmaDeclareEnclave(args[0]);
   } else if (command == "capability" && args.size() == 2) {
-    Actions.ActOnPragmaEnclaveCapability(args[0], args[1]);
+    Actions.ActOnPragmaEnclaveCapability(PragmaLoc, args[0], args[1]);
   } else {
     PP.Diag(Tok, diag::warn_pragma_enclave);
     return;

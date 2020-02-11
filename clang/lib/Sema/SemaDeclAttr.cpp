@@ -1924,7 +1924,13 @@ static void handleGapsEnclaveOnlyAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (!S.checkStringLiteralArgumentAttr(AL, 0, Name, &LiteralLoc))
     return;
 
-  D->addAttr(::new (S.Context) GapsEnclaveOnlyAttr(S.Context, AL, Name));
+  for (auto const& entry : S.Context.Enclaves) {
+    if (entry == Name) {
+      D->addAttr(::new (S.Context) GapsEnclaveOnlyAttr(S.Context, AL, Name));
+      return;
+    }
+  }
+  S.Diag(LiteralLoc, diag::err_unknown_gaps_enclave) << Name;
 }
 
 static void handleGapsEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
@@ -1934,7 +1940,13 @@ static void handleGapsEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (!S.checkStringLiteralArgumentAttr(AL, 0, Name, &LiteralLoc))
     return;
 
-  D->addAttr(::new (S.Context) GapsEnclaveMainAttr(S.Context, AL, Name));
+  for (auto const& entry : S.Context.Enclaves) {
+    if (entry == Name) {
+      D->addAttr(::new (S.Context) GapsEnclaveMainAttr(S.Context, AL, Name));
+      return;
+    }
+  }
+  S.Diag(LiteralLoc, diag::err_unknown_gaps_enclave) << Name;
 }
 
 static void handleGapsCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
@@ -1944,7 +1956,14 @@ static void handleGapsCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (!S.checkStringLiteralArgumentAttr(AL, 0, Name, &LiteralLoc))
     return;
 
-  D->addAttr(::new (S.Context) GapsCapabilityAttr(S.Context, AL, Name));
+  for (auto const& entry : S.Context.Capabilities) {
+    if (entry.first == Name) {
+      D->addAttr(::new (S.Context) GapsCapabilityAttr(S.Context, AL, Name));
+      return;
+    }
+  }
+  S.Diag(LiteralLoc, diag::err_unknown_gaps_capability) << Name;
+
 }
 
 static void handleRestrictAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
