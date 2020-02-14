@@ -3982,9 +3982,13 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
   MaybeHandleStaticInExternC(D, GV);
 
   if (D->hasAttr<GapsCapabilityAttr>()) {
-    GV->addAttribute(
-      "gaps_capability",
-      D->getAttr<GapsCapabilityAttr>()->getCapability());
+    std::string caps;
+    for (auto const& attr : D->specific_attrs<GapsCapabilityAttr>()) {
+      if (!caps.empty()) { caps += ","; }
+      auto cap = attr->getCapability();
+      caps.insert(caps.end(), cap.begin(), cap.end());
+    }
+    GV->addAttribute("gaps_capability", caps);
   }
 
   if (D->hasAttr<GapsEnclaveOnlyAttr>()) {

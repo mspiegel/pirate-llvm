@@ -1438,9 +1438,16 @@ void AsmPrinter::emitGapsSections(Module &M) {
       requirements[getSymbol(&f)].first = enclave;
     }
 
-    if (f.hasFnAttribute("gaps_capability")) {
-      auto capability = f.getFnAttribute("gaps_capability").getValueAsString();
-      requirements[getSymbol(&f)].second.push_back(capability);
+    if (f.hasFnAttribute("gaps_capabilities")) {
+      auto capability = f.getFnAttribute("gaps_capabilities").getValueAsString();
+
+      auto start = capability.begin();
+      decltype(start) end;
+      do {
+        end = std::find(start, capability.end(), ',');
+        requirements[getSymbol(&f)].second.push_back(*(new std::string(start, end)));
+        start = end + 1;
+      } while (end != capability.end());
     }
   }
 
@@ -1451,8 +1458,8 @@ void AsmPrinter::emitGapsSections(Module &M) {
       requirements[getSymbol(&d)].first = enclave;
     }
 
-    if (d.hasAttribute("gaps_capability")) {
-      auto capability = d.getAttribute("gaps_capability").getValueAsString();
+    if (d.hasAttribute("gaps_capabilities")) {
+      auto capability = d.getAttribute("gaps_capabilities").getValueAsString();
       requirements[getSymbol(&d)].second.push_back(capability);
     }
   }

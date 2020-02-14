@@ -10070,4 +10070,9 @@ def err_bit_cast_non_trivially_copyable : Error<
   "__builtin_bit_cast %select{source|destination}0 type must be trivially copyable">;
 def err_bit_cast_type_size_mismatch : Error<
   "__builtin_bit_cast source size does not equal destination size (%0 vs %1)">;
+
+def err_unknown_gaps_capability : Error<
+  "no capability named %0">;
+def err_unknown_gaps_enclave : Error<
+  "no enclave named %0">;
 } // end of sema component.

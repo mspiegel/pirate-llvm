@@ -1222,9 +1222,16 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
     Fn->addFnAttr("gaps_enclave_only",FD->getAttr<GapsEnclaveOnlyAttr>()->getEnclaveName());
   }
 
-  if (FD->hasAttr<GapsEnclaveOnlyAttr>()) {
-    Fn->addFnAttr("gaps_capability",FD->getAttr<GapsCapabilityAttr>()->getCapability());
+  if (FD->hasAttr<GapsCapabilityAttr>()) {
+    std::string caps;
+    for (auto const& attr : FD->specific_attrs<GapsCapabilityAttr>()) {
+      if (!caps.empty()) { caps += ","; }
+      auto cap = attr->getCapability();
+      caps.insert(caps.end(), cap.begin(), cap.end());
+    }
+    Fn->addFnAttr("gaps_capabilities", caps);
   }
+
 
   // Check if we should generate debug info for this function.
   if (FD->hasAttr<NoDebugAttr>())
