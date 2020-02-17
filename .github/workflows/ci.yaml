@@ -7,9 +7,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        name: [LinuxClang]
+        name: [linux]
         include:
-          - name: LinuxClang
+          - name: linux
             os: ubuntu-latest
             CC: clang
             CXX: clang++
