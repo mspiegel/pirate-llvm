@@ -1,0 +1,70 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        name: [linux]
+        include:
+          - name: linux
+            os: ubuntu-latest
+            CC: clang
+            CXX: clang++
+      # complete all jobs
+      fail-fast: false
+    env:
+      # must be inside workspace
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_COMPRESS: true
+      # current cache limit
+      CCACHE_MAXSIZE: 200M
+      ARTIFACT_NAME: pirate-llvm-${{ matrix.name }}-${{ github.sha }}.tgz
+      CC: ${{ matrix.CC }}
+      CXX: ${{ matrix.CXX }}
+    steps:
+      - name: Checkout
+        run: |
+          cd ..
+          echo $PWD
+          ls -la
+          git clone --depth=1 https://github.com/GaloisInc/pirate-llvm.git
+      - name: Cache
+        uses: actions/cache@v1
+        with:
+          path: .ccache
+          key: ${{ matrix.name }}-build-${{ github.sha }}
+          # fall back to (latest) previous cache
+          restore-keys: |
+            ${{ matrix.name }}-build
+      - name: Install packages
+        run: sudo apt-get install ccache ninja-build
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake -G Ninja \
+                -DCMAKE_INSTALL_PREFIX=$PWD/../pirate-llvm \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_BUILD_TOOLS=Off \
+                -DLLVM_CCACHE_BUILD=On \
+                -DLLVM_DISTRIBUTION_COMPONENTS="clang;lld" \
+                -DLLVM_ENABLE_PROJECTS="clang;lld" \
+                -DLLVM_INCLUDE_EXAMPLES=Off \
+                -DLLVM_INSTALL_TOOLCHAIN_ONLY=On \
+                ../llvm
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --target install-distribution
+      - name: Package
+        run: tar cvfz $ARTIFACT_NAME pirate-llvm
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: build-artifacts
+          path: pirate-llvm-${{ matrix.name }}-${{ github.sha }}.tgz
+      - name: CCache stats
+        run: ccache -s
