@@ -1398,33 +1398,35 @@ void AsmPrinter::emitGapsSections(Module &M) {
     std::pair<StringRef,
               std::vector<StringRef>>> requirements;
 
-  NamedMDNode* enclavesMD = M.getNamedMetadata("gaps.enclaves");
-  NamedMDNode* capabilitiesMD = M.getNamedMetadata("gaps.capabilities");
-  NamedMDNode* enclaveCapabilitiesMD = M.getNamedMetadata("gaps.enclave_capabilities");
-
-  for (llvm::MDNode* e : enclavesMD->operands()) {
-    auto name = cast<MDString>(e->getOperand(0).get())->getString();
-    enclaves[name.str()] = std::make_tuple<StringRef, MCSymbol*, std::vector<StringRef>>
-      (StringRef(name), nullptr, {});
-  }
-
-  for (llvm::MDNode* e : capabilitiesMD->operands()) {
-    auto name = cast<MDString>(e->getOperand(0).get())->getString();
-
-    if (e->getNumOperands() == 2) {
-      auto parent = cast<MDString>(e->getOperand(1).get())->getString();
-
-      capabilities[name.str()] = std::make_pair(name, parent);
-    } else {
-      capabilities[name.str()] = std::make_pair(name, "");
+  if (auto* enclavesMD = M.getNamedMetadata("gaps.enclaves")) {
+    for (llvm::MDNode* e : enclavesMD->operands()) {
+      auto name = cast<MDString>(e->getOperand(0).get())->getString();
+      enclaves[name.str()] = std::make_tuple<StringRef, MCSymbol*, std::vector<StringRef>>
+        (StringRef(name), nullptr, {});
     }
   }
 
-  for (llvm::MDNode* e : enclaveCapabilitiesMD->operands()) {
-    auto enclave = cast<MDString>(e->getOperand(0).get())->getString();
-    auto capability = cast<MDString>(e->getOperand(1).get())->getString();
+  if (auto* capabilitiesMD = M.getNamedMetadata("gaps.capabilities")) {
+    for (llvm::MDNode* e : capabilitiesMD->operands()) {
+      auto name = cast<MDString>(e->getOperand(0).get())->getString();
 
-    std::get<2>(enclaves[enclave.str()]).push_back(capability);
+      if (e->getNumOperands() == 2) {
+        auto parent = cast<MDString>(e->getOperand(1).get())->getString();
+
+        capabilities[name.str()] = std::make_pair(name, parent);
+      } else {
+        capabilities[name.str()] = std::make_pair(name, "");
+      }
+    }
+  }
+
+  if (auto* enclaveCapabilitiesMD = M.getNamedMetadata("gaps.enclave_capabilities")) {
+    for (llvm::MDNode* e : enclaveCapabilitiesMD->operands()) {
+      auto enclave = cast<MDString>(e->getOperand(0).get())->getString();
+      auto capability = cast<MDString>(e->getOperand(1).get())->getString();
+
+      std::get<2>(enclaves[enclave.str()]).push_back(capability);
+    }
   }
 
   for (auto const& f : M.functions()) {
@@ -1452,7 +1454,6 @@ void AsmPrinter::emitGapsSections(Module &M) {
   }
 
   for (auto const& d : M.globals()) {
-
     if (d.hasAttribute("gaps_enclave_only")) {
       auto enclave = d.getAttribute("gaps_enclave_only").getValueAsString();
       requirements[getSymbol(&d)].first = enclave;

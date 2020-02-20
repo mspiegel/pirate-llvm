@@ -1223,7 +1223,8 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   }
 
   MCSectionELF *CapStrTabSection = nullptr;
-  if (capstrtab.getSize() > 0) {
+  // The first entry is always populated for the empty string
+  if (capstrtab.getSize() > 1) {
     CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_PROGBITS, 0, 1, "");
     SectionIndexMap[CapStrTabSection] = addToSectionTable(CapStrTabSection);
   }
