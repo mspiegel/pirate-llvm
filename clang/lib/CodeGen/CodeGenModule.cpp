@@ -5954,15 +5954,14 @@ void CodeGenModule::EmitGapsMetadata() {
 
   if (!Context.Capabilities.empty()) {
     auto NMD = getModule().getOrInsertNamedMetadata("gaps.capabilities");
-    for (auto const& cap : Context.Capabilities) {
+    for (auto cap : Context.Capabilities) {
       llvm::MDNode* node;
-      llvm::MDString* name = llvm::MDString::get(Ctx, cap.first);
+      auto name = llvm::MDString::get(Ctx, cap.first);
 
       if (cap.second.empty()) {
-        llvm::MDString* name = llvm::MDString::get(Ctx, cap.first);
         node = llvm::MDNode::get(Ctx, {name});
       } else {
-        llvm::MDString* parent = llvm::MDString::get(Ctx, cap.second);
+        auto parent = llvm::MDString::get(Ctx, cap.second);
         node = llvm::MDNode::get(Ctx, {name, parent});
       }
       NMD->addOperand(node);
@@ -5971,19 +5970,19 @@ void CodeGenModule::EmitGapsMetadata() {
 
   if (!Context.Enclaves.empty()) {
     auto NMD = getModule().getOrInsertNamedMetadata("gaps.enclaves");
-    for (auto const& enclave : Context.Enclaves) {
-      llvm::MDString* name = llvm::MDString::get(Ctx, enclave);
-      llvm::MDNode* node = llvm::MDNode::get(Ctx, {name});
+    for (auto enclave : Context.Enclaves) {
+      auto name = llvm::MDString::get(Ctx, enclave);
+      auto node = llvm::MDNode::get(Ctx, {name});
       NMD->addOperand(node);
     }
   }
 
   if (!Context.EnclaveCapabilities.empty()) {
     auto NMD = getModule().getOrInsertNamedMetadata("gaps.enclave_capabilities");
-    for (auto const& assoc : Context.EnclaveCapabilities) {
-      llvm::MDString* enclave = llvm::MDString::get(Ctx, assoc.first);
-      llvm::MDString* capability = llvm::MDString::get(Ctx, assoc.second);
-      llvm::MDNode* node = llvm::MDNode::get(Ctx, {enclave, capability});
+    for (auto assoc : Context.EnclaveCapabilities) {
+      auto enclave = llvm::MDString::get(Ctx, assoc.first);
+      auto capability = llvm::MDString::get(Ctx, assoc.second);
+      auto node = llvm::MDNode::get(Ctx, {enclave, capability});
       NMD->addOperand(node);
     }
   }
