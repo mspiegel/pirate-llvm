@@ -16,7 +16,7 @@ container=$(docker create \
        -i \
        --cpus=2 \
        --memory=16G \
-       --mount type=bind,src=`pwd`/dist,dst=/root/dist \
+       --mount type=bind,src=`pwd`/images/ubuntu-llvm,dst=/root/dist \
        --mount type=volume,src=pirate-llvm-cache,dst=/root/cache \
        --mount type=bind,src=`pwd`,dst=/root/pirate-llvm,ro \
         -w /root \
