@@ -654,7 +654,7 @@ private:
   mutable unsigned LastFn = 0;
   mutable unsigned Counter = ~0U;
 
-  void emitGapsSections(Module &M);
+  void emitPirateSections(Module &M);
 
   /// This method emits the header for the current function.
   virtual void EmitFunctionHeader();

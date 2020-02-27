@@ -3429,23 +3429,23 @@ def NoBuiltin : Attr {
   let Documentation = [NoBuiltinDocs];
 }
 
-def GapsEnclaveOnly : InheritableAttr {
-  let Spellings = [Clang<"gaps_enclave_only">];
+def PirateEnclaveOnly : InheritableAttr {
+  let Spellings = [Clang<"pirate_enclave_only">];
   let Subjects = SubjectList<[Function, GlobalVar]>;
-  let Documentation = [GapsEnclaveOnlyDocs];
+  let Documentation = [PirateEnclaveOnlyDocs];
   let Args = [StringArgument<"EnclaveName">];
 }
 
-def GapsEnclaveMain : InheritableAttr {
-  let Spellings = [Clang<"gaps_enclave_main">];
+def PirateEnclaveMain : InheritableAttr {
+  let Spellings = [Clang<"pirate_enclave_main">];
   let Subjects = SubjectList<[Function]>;
-  let Documentation = [GapsEnclaveMainDocs];
+  let Documentation = [PirateEnclaveMainDocs];
   let Args = [StringArgument<"EnclaveName">];
 }
 
-def GapsCapability : InheritableAttr {
-  let Spellings = [Clang<"gaps_capability">];
+def PirateCapability : InheritableAttr {
+  let Spellings = [Clang<"pirate_capability">];
   let Subjects = SubjectList<[Function, GlobalVar]>;
-  let Documentation = [GapsCapabilityDocs];
+  let Documentation = [PirateCapabilityDocs];
   let Args = [StringArgument<"Capability">];
 }

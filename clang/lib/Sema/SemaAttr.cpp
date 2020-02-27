@@ -1004,14 +1004,14 @@ void Sema::ActOnPragmaEnclaveCapability(SourceLocation Loc, StringRef enclave, S
   // PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "enclave";
   auto enclave_iter = std::find(Context.Enclaves.begin(), Context.Enclaves.end(), enclave);
   if (enclave_iter == Context.Enclaves.end()) {
-    PP.Diag(Loc, diag::err_unknown_gaps_enclave) << enclave;
+    PP.Diag(Loc, diag::err_unknown_pirate_enclave) << enclave;
     return;
   }
   
   auto capability_iter = std::find_if(Context.Capabilities.begin(), Context.Capabilities.end(),
     [&capability](auto const& entry){ return entry.first == capability; });
   if (capability_iter == Context.Capabilities.end()) {
-    PP.Diag(Loc, diag::err_unknown_gaps_capability) << capability;
+    PP.Diag(Loc, diag::err_unknown_pirate_capability) << capability;
     return;
   }
 
@@ -1028,7 +1028,7 @@ void Sema::ActOnPragmaDeclareCapability(SourceLocation Loc, StringRef Name, Stri
   auto capability_iter = std::find_if(Context.Capabilities.begin(), Context.Capabilities.end(),
     [&Parent](auto const& entry){ return entry.first == Parent; });
   if (capability_iter == Context.Capabilities.end()) {
-    PP.Diag(Loc, diag::err_unknown_gaps_capability) << Parent;
+    PP.Diag(Loc, diag::err_unknown_pirate_capability) << Parent;
     return;
   }
 

@@ -1382,7 +1382,7 @@ void AsmPrinter::emitRemarksSection(RemarkStreamer &RS) {
   OutStreamer->EmitBinaryData(OS.str());
 }
 
-void AsmPrinter::emitGapsSections(Module &M) {
+void AsmPrinter::emitPirateSections(Module &M) {
 
   std::unordered_map<
     std::string, 
@@ -1430,18 +1430,18 @@ void AsmPrinter::emitGapsSections(Module &M) {
   }
 
   for (auto const& f : M.functions()) {
-    if (f.hasFnAttribute("gaps_enclave_main")) {
-      auto enclave = f.getFnAttribute("gaps_enclave_main").getValueAsString().str();
+    if (f.hasFnAttribute("pirate_enclave_main")) {
+      auto enclave = f.getFnAttribute("pirate_enclave_main").getValueAsString().str();
       std::get<1>(enclaves[enclave]) = getSymbol(&f);
     }
 
-    if (f.hasFnAttribute("gaps_enclave_only")) {
-      auto enclave = f.getFnAttribute("gaps_enclave_only").getValueAsString();
+    if (f.hasFnAttribute("pirate_enclave_only")) {
+      auto enclave = f.getFnAttribute("pirate_enclave_only").getValueAsString();
       requirements[getSymbol(&f)].first = enclave;
     }
 
-    if (f.hasFnAttribute("gaps_capabilities")) {
-      auto capability = f.getFnAttribute("gaps_capabilities").getValueAsString();
+    if (f.hasFnAttribute("pirate_capabilities")) {
+      auto capability = f.getFnAttribute("pirate_capabilities").getValueAsString();
 
       auto start = capability.begin();
       decltype(start) end;
@@ -1454,13 +1454,13 @@ void AsmPrinter::emitGapsSections(Module &M) {
   }
 
   for (auto const& d : M.globals()) {
-    if (d.hasAttribute("gaps_enclave_only")) {
-      auto enclave = d.getAttribute("gaps_enclave_only").getValueAsString();
+    if (d.hasAttribute("pirate_enclave_only")) {
+      auto enclave = d.getAttribute("pirate_enclave_only").getValueAsString();
       requirements[getSymbol(&d)].first = enclave;
     }
 
-    if (d.hasAttribute("gaps_capabilities")) {
-      auto capability = d.getAttribute("gaps_capabilities").getValueAsString();
+    if (d.hasAttribute("pirate_capabilities")) {
+      auto capability = d.getAttribute("pirate_capabilities").getValueAsString();
       requirements[getSymbol(&d)].second.push_back(capability);
     }
   }
@@ -1737,7 +1737,7 @@ bool AsmPrinter::doFinalization(Module &M) {
     }
   }
 
-  emitGapsSections(M);
+  emitPirateSections(M);
 
   // Allow the target to emit any magic that it wants at the end of the file,
   // after everything else has gone out.

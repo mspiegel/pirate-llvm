@@ -1214,22 +1214,22 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
   FunctionArgList Args;
   QualType ResTy = BuildFunctionArgList(GD, Args);
 
-  if (FD->hasAttr<GapsEnclaveMainAttr>()) {
-    Fn->addFnAttr("gaps_enclave_main",FD->getAttr<GapsEnclaveMainAttr>()->getEnclaveName());
+  if (FD->hasAttr<PirateEnclaveMainAttr>()) {
+    Fn->addFnAttr("pirate_enclave_main",FD->getAttr<PirateEnclaveMainAttr>()->getEnclaveName());
   }
 
-  if (FD->hasAttr<GapsEnclaveOnlyAttr>()) {
-    Fn->addFnAttr("gaps_enclave_only",FD->getAttr<GapsEnclaveOnlyAttr>()->getEnclaveName());
+  if (FD->hasAttr<PirateEnclaveOnlyAttr>()) {
+    Fn->addFnAttr("pirate_enclave_only",FD->getAttr<PirateEnclaveOnlyAttr>()->getEnclaveName());
   }
 
-  if (FD->hasAttr<GapsCapabilityAttr>()) {
+  if (FD->hasAttr<PirateCapabilityAttr>()) {
     std::string caps;
-    for (auto const& attr : FD->specific_attrs<GapsCapabilityAttr>()) {
+    for (auto const& attr : FD->specific_attrs<PirateCapabilityAttr>()) {
       if (!caps.empty()) { caps += ","; }
       auto cap = attr->getCapability();
       caps.insert(caps.end(), cap.begin(), cap.end());
     }
-    Fn->addFnAttr("gaps_capabilities", caps);
+    Fn->addFnAttr("pirate_capabilities", caps);
   }
 
 

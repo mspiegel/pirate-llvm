@@ -1917,7 +1917,7 @@ static void handleTLSModelAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   D->addAttr(::new (S.Context) TLSModelAttr(S.Context, AL, Model));
 }
 
-static void handleGapsEnclaveOnlyAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+static void handlePirateEnclaveOnlyAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   StringRef Name;
   SourceLocation LiteralLoc;
   // Check that it is a string.
@@ -1926,14 +1926,14 @@ static void handleGapsEnclaveOnlyAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
 
   for (auto const& entry : S.Context.Enclaves) {
     if (entry == Name) {
-      D->addAttr(::new (S.Context) GapsEnclaveOnlyAttr(S.Context, AL, Name));
+      D->addAttr(::new (S.Context) PirateEnclaveOnlyAttr(S.Context, AL, Name));
       return;
     }
   }
-  S.Diag(LiteralLoc, diag::err_unknown_gaps_enclave) << Name;
+  S.Diag(LiteralLoc, diag::err_unknown_pirate_enclave) << Name;
 }
 
-static void handleGapsEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+static void handlePirateEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   StringRef Name;
   SourceLocation LiteralLoc;
   // Check that it is a string.
@@ -1942,14 +1942,14 @@ static void handleGapsEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
 
   for (auto const& entry : S.Context.Enclaves) {
     if (entry == Name) {
-      D->addAttr(::new (S.Context) GapsEnclaveMainAttr(S.Context, AL, Name));
+      D->addAttr(::new (S.Context) PirateEnclaveMainAttr(S.Context, AL, Name));
       return;
     }
   }
-  S.Diag(LiteralLoc, diag::err_unknown_gaps_enclave) << Name;
+  S.Diag(LiteralLoc, diag::err_unknown_pirate_enclave) << Name;
 }
 
-static void handleGapsCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+static void handlePirateCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   StringRef Name;
   SourceLocation LiteralLoc;
   // Check that it is a string.
@@ -1958,11 +1958,11 @@ static void handleGapsCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
 
   for (auto const& entry : S.Context.Capabilities) {
     if (entry.first == Name) {
-      D->addAttr(::new (S.Context) GapsCapabilityAttr(S.Context, AL, Name));
+      D->addAttr(::new (S.Context) PirateCapabilityAttr(S.Context, AL, Name));
       return;
     }
   }
-  S.Diag(LiteralLoc, diag::err_unknown_gaps_capability) << Name;
+  S.Diag(LiteralLoc, diag::err_unknown_pirate_capability) << Name;
 
 }
 
@@ -7297,16 +7297,16 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     handleArmMveAliasAttr(S, D, AL);
     break;
 
-  case ParsedAttr::AT_GapsEnclaveOnly:
-    handleGapsEnclaveOnlyAttr(S, D, AL);
+  case ParsedAttr::AT_PirateEnclaveOnly:
+    handlePirateEnclaveOnlyAttr(S, D, AL);
     break;
 
-  case ParsedAttr::AT_GapsEnclaveMain:
-    handleGapsEnclaveMainAttr(S, D, AL);
+  case ParsedAttr::AT_PirateEnclaveMain:
+    handlePirateEnclaveMainAttr(S, D, AL);
     break;
 
-  case ParsedAttr::AT_GapsCapability:
-    handleGapsCapabilityAttr(S, D, AL);
+  case ParsedAttr::AT_PirateCapability:
+    handlePirateCapabilityAttr(S, D, AL);
     break;
   }
 }

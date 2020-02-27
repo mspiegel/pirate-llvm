@@ -3981,20 +3981,20 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
 
   MaybeHandleStaticInExternC(D, GV);
 
-  if (D->hasAttr<GapsCapabilityAttr>()) {
+  if (D->hasAttr<PirateCapabilityAttr>()) {
     std::string caps;
-    for (auto const& attr : D->specific_attrs<GapsCapabilityAttr>()) {
+    for (auto const& attr : D->specific_attrs<PirateCapabilityAttr>()) {
       if (!caps.empty()) { caps += ","; }
       auto cap = attr->getCapability();
       caps.insert(caps.end(), cap.begin(), cap.end());
     }
-    GV->addAttribute("gaps_capability", caps);
+    GV->addAttribute("pirate_capability", caps);
   }
 
-  if (D->hasAttr<GapsEnclaveOnlyAttr>()) {
+  if (D->hasAttr<PirateEnclaveOnlyAttr>()) {
     GV->addAttribute(
-      "gaps_enclave_only",
-      D->getAttr<GapsEnclaveOnlyAttr>()->getEnclaveName());
+      "pirate_enclave_only",
+      D->getAttr<PirateEnclaveOnlyAttr>()->getEnclaveName());
   }
 
   if (D->hasAttr<AnnotateAttr>())
@@ -5953,7 +5953,7 @@ void CodeGenModule::EmitGapsMetadata() {
   llvm::LLVMContext &Ctx = TheModule.getContext();
 
   if (!Context.Capabilities.empty()) {
-    auto NMD = getModule().getOrInsertNamedMetadata("gaps.capabilities");
+    auto NMD = getModule().getOrInsertNamedMetadata("pirate.capabilities");
     for (auto cap : Context.Capabilities) {
       llvm::MDNode* node;
       auto name = llvm::MDString::get(Ctx, cap.first);
@@ -5969,7 +5969,7 @@ void CodeGenModule::EmitGapsMetadata() {
   }
 
   if (!Context.Enclaves.empty()) {
-    auto NMD = getModule().getOrInsertNamedMetadata("gaps.enclaves");
+    auto NMD = getModule().getOrInsertNamedMetadata("pirate.enclaves");
     for (auto enclave : Context.Enclaves) {
       auto name = llvm::MDString::get(Ctx, enclave);
       auto node = llvm::MDNode::get(Ctx, {name});
@@ -5978,7 +5978,7 @@ void CodeGenModule::EmitGapsMetadata() {
   }
 
   if (!Context.EnclaveCapabilities.empty()) {
-    auto NMD = getModule().getOrInsertNamedMetadata("gaps.enclave_capabilities");
+    auto NMD = getModule().getOrInsertNamedMetadata("pirate.enclave_capabilities");
     for (auto assoc : Context.EnclaveCapabilities) {
       auto enclave = llvm::MDString::get(Ctx, assoc.first);
       auto capability = llvm::MDString::get(Ctx, assoc.second);
