@@ -200,8 +200,7 @@ class Parser : public CodeCompletionHandler {
   std::unique_ptr<PragmaHandler> STDCCXLIMITHandler;
   std::unique_ptr<PragmaHandler> STDCUnknownHandler;
   std::unique_ptr<PragmaHandler> AttributePragmaHandler;
-  std::unique_ptr<PragmaHandler> SensitivityPragmaHandler;
-  std::unique_ptr<PragmaHandler> EnclavePragmaHandler;
+  std::unique_ptr<PragmaHandler> PiratePragmaHandler;
 
 
   std::unique_ptr<CommentHandler> CommentSemaHandler;

@@ -263,16 +263,9 @@ struct PragmaAttributeHandler : public PragmaHandler {
   ParsedAttributes AttributesForPragmaAttribute;
 };
 
-struct PragmaCapabilityHandler : public PragmaHandler {
+struct PragmaPirateHandler : public PragmaHandler {
   Sema &Actions;
-  PragmaCapabilityHandler(Sema& Actions) : PragmaHandler("capability"), Actions(Actions) {}
-  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
-                    Token &FirstToken) override;
-};
-
-struct PragmaEnclaveHandler : public PragmaHandler {
-  Sema &Actions;
-  PragmaEnclaveHandler(Sema& Actions) : PragmaHandler("enclave"), Actions(Actions) {}
+  PragmaPirateHandler(Sema& Actions) : PragmaHandler("pirate"), Actions(Actions) {}
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
                     Token &FirstToken) override;
 };
@@ -398,11 +391,8 @@ void Parser::initializePragmaHandlers() {
       std::make_unique<PragmaAttributeHandler>(AttrFactory);
   PP.AddPragmaHandler("clang", AttributePragmaHandler.get());
 
-  SensitivityPragmaHandler = std::make_unique<PragmaCapabilityHandler>(Actions);
-  PP.AddPragmaHandler(SensitivityPragmaHandler.get());
-
-  EnclavePragmaHandler = std::make_unique<PragmaEnclaveHandler>(Actions);
-  PP.AddPragmaHandler(EnclavePragmaHandler.get());
+  PiratePragmaHandler = std::make_unique<PragmaPirateHandler>(Actions);
+  PP.AddPragmaHandler(PiratePragmaHandler.get());
 }
 
 void Parser::resetPragmaHandlers() {
@@ -509,11 +499,8 @@ void Parser::resetPragmaHandlers() {
   PP.RemovePragmaHandler("clang", AttributePragmaHandler.get());
   AttributePragmaHandler.reset();
 
-  PP.RemovePragmaHandler(SensitivityPragmaHandler.get());
-  SensitivityPragmaHandler.reset();
-
-  PP.RemovePragmaHandler(EnclavePragmaHandler.get());
-  EnclavePragmaHandler.reset();
+  PP.RemovePragmaHandler(PiratePragmaHandler.get());
+  PiratePragmaHandler.reset();
 }
 
 /// Handle the annotation token produced for #pragma unused(...)
@@ -3307,78 +3294,9 @@ void PragmaAttributeHandler::HandlePragma(Preprocessor &PP,
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
 }
 
-void PragmaCapabilityHandler::HandlePragma(
-  Preprocessor &PP,
-  PragmaIntroducer Introducer,
-  Token &Tok)
-{
-  SourceLocation PragmaLoc = Tok.getLocation();
-  StringRef command;
-  std::vector<StringRef> args;
-
-  PP.Lex(Tok);
-  if (Tok.isAnyIdentifier()) {
-    command = Tok.getIdentifierInfo()->getName();
-  } else {
-    PP.Diag(Tok, diag::warn_pragma_capability);
-    return;
-  }
-
-  PP.Lex(Tok);
-  if (Tok.isNot(tok::l_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_capability);
-    return;
-  }
-  
-  PP.Lex(Tok);
-  if (Tok.isAnyIdentifier()) {
-
-    for (;;) {
-      args.push_back(Tok.getIdentifierInfo()->getName());
-
-      PP.Lex(Tok);
-      if (Tok.is(tok::comma)) {
-        PP.Lex(Tok);
-        if (!Tok.isAnyIdentifier()) {
-          PP.Diag(PragmaLoc, diag::warn_pragma_capability);
-          return;
-        }
-      } else if (Tok.is(tok::r_paren)) {
-        break;
-      } else {
-        PP.Diag(PragmaLoc, diag::warn_pragma_capability);
-        return;
-      }
-    }
-
-  } else if (Tok.isNot(tok::r_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_capability);
-    return;
-  }
-
-  PP.Lex(Tok);
-  if (Tok.isNot(tok::eod)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "capability";
-    return;
-  }
-
-  if (command == "declare" && args.size() == 1) {
-    Actions.ActOnPragmaDeclareCapability(args[0]);
-  } else if (command == "declare" && args.size() == 2) {
-    Actions.ActOnPragmaDeclareCapability(PragmaLoc, args[0], args[1]);
-  } else {
-    PP.Diag(PragmaLoc, diag::warn_pragma_capability);
-    return;
-  }
-
-  return;
-}
-
-void PragmaEnclaveHandler::HandlePragma(
-  Preprocessor &PP,
-  PragmaIntroducer Introducer,
-  Token &Tok)
-{
+void PragmaPirateHandler::HandlePragma(Preprocessor &PP,
+                                       PragmaIntroducer Introducer,
+                                       Token &Tok) {
   SourceLocation PragmaLoc = Tok.getLocation();
   StringRef command;
   std::vector<StringRef> args;
@@ -3391,50 +3309,118 @@ void PragmaEnclaveHandler::HandlePragma(
     return;
   }
 
-  PP.Lex(Tok);
-  if (Tok.isNot(tok::l_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
-    return;
-  }
-  
-  PP.Lex(Tok);
-  if (Tok.isAnyIdentifier()) {
+  if (command == "enclave") {
+    PP.Lex(Tok);
+    if (Tok.isAnyIdentifier()) {
+      command = Tok.getIdentifierInfo()->getName();
+    } else {
+      PP.Diag(Tok, diag::warn_pragma_enclave);
+      return;
+    }
 
-    for (;;) {
-      args.push_back(Tok.getIdentifierInfo()->getName());
+    PP.Lex(Tok);
+    if (Tok.isNot(tok::l_paren)) {
+      PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
+      return;
+    }
 
-      PP.Lex(Tok);
-      if (Tok.is(tok::comma)) {
+    PP.Lex(Tok);
+    if (Tok.isAnyIdentifier()) {
+
+      for (;;) {
+        args.push_back(Tok.getIdentifierInfo()->getName());
+
         PP.Lex(Tok);
-        if (!Tok.isAnyIdentifier()) {
+        if (Tok.is(tok::comma)) {
+          PP.Lex(Tok);
+          if (!Tok.isAnyIdentifier()) {
+            PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
+            return;
+          }
+        } else if (Tok.is(tok::r_paren)) {
+          break;
+        } else {
           PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
           return;
         }
-      } else if (Tok.is(tok::r_paren)) {
-        break;
-      } else {
-        PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
-        return;
       }
+
+    } else if (Tok.isNot(tok::r_paren)) {
+      PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
+      return;
     }
 
-  } else if (Tok.isNot(tok::r_paren)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
-    return;
-  }
+    PP.Lex(Tok);
+    if (Tok.isNot(tok::eod)) {
+      PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "enclave";
+      return;
+    }
 
-  PP.Lex(Tok);
-  if (Tok.isNot(tok::eod)) {
-    PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "enclave";
-    return;
-  }
+    if (command == "declare" && args.size() == 1) {
+      Actions.ActOnPragmaDeclareEnclave(args[0]);
+    } else if (command == "capability" && args.size() == 2) {
+      Actions.ActOnPragmaEnclaveCapability(PragmaLoc, args[0], args[1]);
+    } else {
+      PP.Diag(Tok, diag::warn_pragma_enclave);
+      return;
+    }
+  } else if (command == "capability") {
+    PP.Lex(Tok);
+    if (Tok.isAnyIdentifier()) {
+      command = Tok.getIdentifierInfo()->getName();
+    } else {
+      PP.Diag(Tok, diag::warn_pragma_capability);
+      return;
+    }
 
-  if (command == "declare" && args.size() == 1) {
-    Actions.ActOnPragmaDeclareEnclave(args[0]);
-  } else if (command == "capability" && args.size() == 2) {
-    Actions.ActOnPragmaEnclaveCapability(PragmaLoc, args[0], args[1]);
+    PP.Lex(Tok);
+    if (Tok.isNot(tok::l_paren)) {
+      PP.Diag(PragmaLoc, diag::warn_pragma_capability);
+      return;
+    }
+
+    PP.Lex(Tok);
+    if (Tok.isAnyIdentifier()) {
+
+      for (;;) {
+        args.push_back(Tok.getIdentifierInfo()->getName());
+
+        PP.Lex(Tok);
+        if (Tok.is(tok::comma)) {
+          PP.Lex(Tok);
+          if (!Tok.isAnyIdentifier()) {
+            PP.Diag(PragmaLoc, diag::warn_pragma_capability);
+            return;
+          }
+        } else if (Tok.is(tok::r_paren)) {
+          break;
+        } else {
+          PP.Diag(PragmaLoc, diag::warn_pragma_capability);
+          return;
+        }
+      }
+
+    } else if (Tok.isNot(tok::r_paren)) {
+      PP.Diag(PragmaLoc, diag::warn_pragma_capability);
+      return;
+    }
+
+    PP.Lex(Tok);
+    if (Tok.isNot(tok::eod)) {
+      PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "capability";
+      return;
+    }
+
+    if (command == "declare" && args.size() == 1) {
+      Actions.ActOnPragmaDeclareCapability(args[0]);
+    } else if (command == "declare" && args.size() == 2) {
+      Actions.ActOnPragmaDeclareCapability(PragmaLoc, args[0], args[1]);
+    } else {
+      PP.Diag(PragmaLoc, diag::warn_pragma_capability);
+      return;
+    }
   } else {
-    PP.Diag(Tok, diag::warn_pragma_enclave);
+    PP.Diag(Tok, diag::warn_pragma_enclave); // XXX
     return;
   }
 
