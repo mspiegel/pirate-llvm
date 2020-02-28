@@ -287,6 +287,15 @@ void addReservedSymbols() {
   if (script->hasSectionsCommand)
     return;
 
+  //for (SectionBase *sec : outputSections) {
+  //  if (sec->name.startswith(".gaps.res")) {
+  //    StringRef type = sec->name.drop_front(10); // Strip ".gaps.res."
+  //    std::string *sname = make<std::string>("__" + type.str() + "_gaps_resources");
+
+  //    addOptionalRegular(*sname, sec, 0, STV_DEFAULT);
+  //  }
+  //}
+
   auto add = [](StringRef s, int64_t pos) {
     return addOptionalRegular(s, Out::elfHeader, pos, STV_DEFAULT);
   };
@@ -2011,8 +2020,18 @@ template <class ELFT> void Writer<ELFT>::addStartEndSymbols() {
 template <class ELFT>
 void Writer<ELFT>::addStartStopSymbols(OutputSection *sec) {
   StringRef s = sec->name;
+  std::string buf;
+
+  if (s.startswith(".gaps.res.")) {
+    buf = s.drop_front(1);
+    for (char &c : buf)
+      c = c == '.' ? '_' : c;
+    s = buf.c_str();
+  }
+
   if (!isValidCIdentifier(s))
     return;
+
   addOptionalRegular(saver.save("__start_" + s), sec, 0, STV_PROTECTED);
   addOptionalRegular(saver.save("__stop_" + s), sec, -1, STV_PROTECTED);
 }
