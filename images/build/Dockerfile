@@ -4,6 +4,10 @@ FROM ubuntu:latest
 MAINTAINER Joe Hendrix (jhendrix@galois.com)
 
 RUN apt-get update \
+ && apt-get install --no-install-recommends -y apt-transport-https ca-certificates gnupg software-properties-common wget \
+ && wget -qO - https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add - \
+ && apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' \
+ && apt-get update \
  && apt-get install --no-install-recommends -y ccache clang-9 cmake git ninja-build python3-pip \
  && rm -rf /var/lib/apt/lists/*
 
