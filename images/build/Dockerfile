@@ -8,8 +8,12 @@ RUN apt-get update \
  && wget -qO - https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add - \
  && apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' \
  && apt-get update \
- && apt-get install --no-install-recommends -y ccache clang-9 cmake git ninja-build python3-pip \
+ && apt-get install --no-install-recommends -y ccache clang-9 cmake git make ninja-build python3-pip \
  && rm -rf /var/lib/apt/lists/*
 
 # Install sphinx
 RUN pip3 install -U Sphinx
+
+# Add links
+RUN ln -s /usr/bin/clang-9 /usr/local/bin/cc \
+ && ln -s /usr/bin/clang++-9 /usr/local/bin/c++
