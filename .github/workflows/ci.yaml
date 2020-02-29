@@ -24,8 +24,8 @@ jobs:
           # fall back to (latest) previous cache
           restore-keys: |
             ${{ matrix.name }}-build
-      - name: Make ubuntu-build docker image
-        run: docker build -t pirateteam/ubuntu-dev images/ubuntu-build
+      - name: Make pirateteam/build docker image
+        run: docker build -t pirateteam/build images/build
       - name: Build
         run: |
           mkdir -p cache
@@ -33,17 +33,17 @@ jobs:
           docker run -i \
             --cpus=2 \
             --memory=16G \
-            --mount type=bind,src=`pwd`/images/ubuntu-llvm,dst=/root/dist \
+            --mount type=bind,src=`pwd`/images/llvm-ubuntu,dst=/root/dist \
             --mount type=bind,src=`pwd`/cache,dst=/root/cache \
             --mount type=bind,src=`pwd`,dst=/root/pirate-llvm,ro \
             -w /root \
-            pirateteam/ubuntu-dev \
+            pirateteam/build \
             /root/pirate-llvm/scripts/docker-internal.sh
-      - name: Make pirate-llvm docker image
-        run: docker build -t pirateteam/ubuntu-llvm images/ubuntu-llvm
+      - name: Make pirateteam/llvm-ubuntu docker image
+        run: docker build -t pirateteam/llvm-ubuntu images/llvm-ubuntu
       - name: Post docker images
         run: |
           echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
-          docker push pirateteam/ubuntu-dev
-          docker push pirateteam/ubuntu-llvm
+          docker push pirateteam/build
+          docker push pirateteam/llvm-ubuntu
         if: github.ref == 'refs/heads/master'
