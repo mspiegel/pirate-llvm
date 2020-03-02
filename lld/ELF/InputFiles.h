@@ -20,6 +20,7 @@
 #include "llvm/IR/Comdat.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ELF.h"
+#include "llvm/Object/Gaps.h"
 #include "llvm/Object/IRObjectFile.h"
 #include "llvm/Support/Threading.h"
 #include <map>

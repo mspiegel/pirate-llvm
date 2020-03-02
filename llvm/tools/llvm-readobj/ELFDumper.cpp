@@ -36,6 +36,7 @@
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/ELFTypes.h"
 #include "llvm/Object/Error.h"
+#include "llvm/Object/Gaps.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/RelocationResolver.h"
 #include "llvm/Object/StackMapParser.h"
@@ -1969,7 +1970,7 @@ template <class ELFT> void ELFDumper<ELFT>::printGapsInfo() {
   Gaps.capabilities = mkArray<ELFT,Elf_GAPS_cap<ELFT>>(ObjF, GapsCapabilitiesSec);
   Gaps.symreqs = mkArray<ELFT,Elf_GAPS_req<ELFT>>(ObjF, GapsSymreqsSec);
   Gaps.captab = mkArray<ELFT,uint32_t>(ObjF, GapsCaptabSec);
-  Gaps.strtab = mkArray<ELFT,char>(ObjF, GapsStrtabSec);
+  Gaps.setStrTab(mkArray<ELFT,char>(ObjF, GapsStrtabSec));
 
   ELFDumperStyle->printGapsInfo(ObjF, Gaps);
 }
@@ -5149,6 +5150,7 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
     }
 
     std::string EncName = to_string(format_decimal(Req.req_enc, 1));
+    // TODO: Check Req.req_enc is valid.
     if (Req.req_enc) {
       Elf_GAPS_enc<ELFT> Enc = Gaps.enclaves[Req.req_enc];
       EncName = to_string(Gaps.getStrtabEntry(Enc.enc_name)) + " (" + EncName + ")";
@@ -5157,11 +5159,15 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
     std::string CapList = to_string(format_decimal(Req.req_cap, 1));
     if (Req.req_cap) {
       CapList.clear();
-      for (uint32_t i = Req.req_cap; Gaps.captab[i]; ++i) {
-        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[i]];
+      auto caps = Gaps.getCapabilityIndices(Req.req_cap);
+      if (caps.data() == 0) {
+        report_fatal_error("Illegal capability index.");
+      }
+      for (auto i = caps.begin(); i != caps.end(); ++i) {
+        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[*i];
         CapList += to_string(Gaps.getStrtabEntry(Cap.cap_name));
-        CapList += " (" + to_string(Gaps.captab[i]) + ")";
-        if (Gaps.captab[i+1])
+        CapList += " (" + to_string(*i) + ")";
+        if (i+1 != caps.end())
           CapList += ", ";
       }
     }

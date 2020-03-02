@@ -1597,7 +1597,7 @@ static bool readGapsSection(InputSectionBase *s) {
   else if (s->name == ".gaps.captab")
     s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
   else if (s->name == ".gaps.strtab")
-    s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
+    s->getFile<ELFT>()->gaps.setStrTab(s->getDataAs<char>());
 
   return true;
 }
@@ -1761,22 +1761,23 @@ void processGapsEnclave() {
     auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
     if (!f)
       continue;
-
+    f->gaps.checkStrtabInitialized();
     for (auto e = f->gaps.enclaves.begin() + 1; e < f->gaps.enclaves.end(); ++e) {
-      StringRef name = f->gaps.getStrtabEntry(e->enc_name);
+      // Skip entries that do not mach enclave
+      const char* entry = f->gaps.getStrtabEntry(e->enc_name);
+      if (strncmp(entry, config->enclave.data(), config->enclave.size()+1))
+        continue;
 
-      if (name.equals(config->enclave)) {
-        enclave = enclave ? enclave : make<Enclave>(config->enclave);
+      enclave = enclave ? enclave : make<Enclave>(config->enclave);
 
-        if (enclave->main && e->enc_main)
-          error("Multiple main function specified for enclave " + enclave->name);
-        else
-          enclave->main = &f->getSymbol(e->enc_main);
+      if (enclave->main && e->enc_main)
+         error("Multiple main function specified for enclave " + enclave->name);
+      else
+        enclave->main = &f->getSymbol(e->enc_main);
 
-        std::vector<StringRef> caps;
-        f->gaps.getSuppliedCaps(e->enc_cap, caps);
-        enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
-      }
+      std::vector<StringRef> caps;
+      f->gaps.getSuppliedCaps(e->enc_cap, caps);
+      enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
     }
   }
 }
@@ -1792,7 +1793,7 @@ void processGapsRequirements() {
       std::vector<StringRef> caps;
       f->gaps.getRequiredCaps(r->req_cap, caps);
       const char *enclaveName = r->req_enc
-          ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data()
+          ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name)
           : nullptr;
       Symbol *symbol = &f->getSymbol(r->req_sym);
 
