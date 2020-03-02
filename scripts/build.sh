@@ -10,19 +10,21 @@
 # inspected.
 set -e
 
-mkdir -p dist
+mkdir -p cache
+
+docker build -t pirateteam/build images/build
 
 container=$(docker create \
        -i \
        --cpus=2 \
-       --memory=16G \
+       --memory=32G \
        --mount type=bind,src=`pwd`/images/llvm-ubuntu,dst=/root/dist \
-       --mount type=volume,src=pirate-llvm-cache,dst=/root/cache \
+       --mount type=bind,src=`pwd`/cache,dst=/root/cache \
        --mount type=bind,src=`pwd`,dst=/root/pirate-llvm,ro \
         -w /root \
-       pirateteam/ubuntu-dev)
+       pirateteam/build)
 echo "Created container: $container"
 docker start $container
-docker exec $container /root/pirate-llvm/scripts/docker-internal.sh
+docker exec $container /root/pirate-llvm/scripts/docker-internal.sh Release
 docker stop $container
 docker container rm $container

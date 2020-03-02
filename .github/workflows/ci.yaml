@@ -3,31 +3,44 @@ name: CI
 on: [push]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        name: [linux-docker]
-        include:
-          - name: linux-docker
-            os: ubuntu-latest
-      # complete all jobs
-      fail-fast: false
+  docker-image:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Make pirateteam/build docker image
+        run: |
+          docker build -t pirateteam/build images/build
+          docker save pirateteam/build | gzip > pirateteam_build_latest.tar.gz
+      - name: Save build image artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: pirateteam_build
+          path: latest.tar.gz
+      - name: Post docker images
+        run: |
+          echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
+          docker push pirateteam/build
+        if: github.ref == 'refs/heads/master'
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Download build image artifact from previous job
+        uses: actions/download-artifact@v1
+        with:
+          name: pirateteam_build
       - name: Cache
         uses: actions/cache@v1
         with:
           path: cache
-          key: ${{ matrix.name }}-build-${{ github.sha }}
+          key: linux-docker-build-${{ github.sha }}
           # fall back to (latest) previous cache
-          restore-keys: |
-            ${{ matrix.name }}-build
-      - name: Make pirateteam/build docker image
-        run: docker build -t pirateteam/build images/build
+          restore-keys: linux-docker-build
       - name: Build
         run: |
+          docker load < pirateteam_build/latest.tar.gz
           mkdir -p cache
           mkdir -p dist
           docker run -i \
@@ -38,12 +51,11 @@ jobs:
             --mount type=bind,src=`pwd`,dst=/root/pirate-llvm,ro \
             -w /root \
             pirateteam/build \
-            /root/pirate-llvm/scripts/docker-internal.sh
+            /root/pirate-llvm/scripts/docker-internal.sh Release
       - name: Make pirateteam/llvm-ubuntu docker image
         run: docker build -t pirateteam/llvm-ubuntu images/llvm-ubuntu
       - name: Post docker images
         run: |
           echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
-          docker push pirateteam/build
           docker push pirateteam/llvm-ubuntu
         if: github.ref == 'refs/heads/master'
