@@ -1398,7 +1398,7 @@ void AsmPrinter::emitPirateSections(Module &M) {
     std::pair<StringRef,
               std::vector<StringRef>>> requirements;
 
-  if (auto* enclavesMD = M.getNamedMetadata("gaps.enclaves")) {
+  if (auto* enclavesMD = M.getNamedMetadata("pirate.enclaves")) {
     for (llvm::MDNode* e : enclavesMD->operands()) {
       auto name = cast<MDString>(e->getOperand(0).get())->getString();
       enclaves[name.str()] = std::make_tuple<StringRef, MCSymbol*, std::vector<StringRef>>
@@ -1406,7 +1406,7 @@ void AsmPrinter::emitPirateSections(Module &M) {
     }
   }
 
-  if (auto* capabilitiesMD = M.getNamedMetadata("gaps.capabilities")) {
+  if (auto* capabilitiesMD = M.getNamedMetadata("pirate.capabilities")) {
     for (llvm::MDNode* e : capabilitiesMD->operands()) {
       auto name = cast<MDString>(e->getOperand(0).get())->getString();
 
@@ -1420,7 +1420,7 @@ void AsmPrinter::emitPirateSections(Module &M) {
     }
   }
 
-  if (auto* enclaveCapabilitiesMD = M.getNamedMetadata("gaps.enclave_capabilities")) {
+  if (auto* enclaveCapabilitiesMD = M.getNamedMetadata("pirate.enclave_capabilities")) {
     for (llvm::MDNode* e : enclaveCapabilitiesMD->operands()) {
       auto enclave = cast<MDString>(e->getOperand(0).get())->getString();
       auto capability = cast<MDString>(e->getOperand(1).get())->getString();

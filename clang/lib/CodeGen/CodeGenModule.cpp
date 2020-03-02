@@ -446,7 +446,7 @@ void CodeGenModule::Release() {
     EmitModuleLinkOptions();
   }
 
-  EmitGapsMetadata();
+  EmitPirateMetadata();
 
   // On ELF we pass the dependent library specifiers directly to the linker
   // without manipulating them. This is in contrast to other platforms where
@@ -5948,7 +5948,7 @@ CodeGenModule::createOpenCLIntToSamplerConversion(const Expr *E,
                                 {C});
 }
 
-void CodeGenModule::EmitGapsMetadata() {
+void CodeGenModule::EmitPirateMetadata() {
 
   llvm::LLVMContext &Ctx = TheModule.getContext();
 

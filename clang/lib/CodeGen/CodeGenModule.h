@@ -1366,7 +1366,7 @@ public:
   /// \param QT is the clang QualType of the null pointer.
   llvm::Constant *getNullPointer(llvm::PointerType *T, QualType QT);
 
-  void EmitGapsMetadata();
+  void EmitPirateMetadata();
 
 private:
   llvm::Constant *GetOrCreateLLVMFunction(
