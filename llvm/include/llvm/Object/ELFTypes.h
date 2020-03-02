@@ -780,6 +780,16 @@ template <class ELFT> struct Elf_GAPS_cap {
   Elf_Word cap_padding;
 };
 
+template <class ELFT> struct Elf_GAPS_res {
+  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
+  Elf_Addr gr_name;
+  Elf_Addr gr_obj;
+  Elf_Addr gr_params;
+  Elf_Word gr_size;
+  Elf_Half gr_align;
+  Elf_Half gr_sym;
+};
+
 template <typename ELFT> struct Elf_GAPS_Impl {
   ArrayRef<llvm::object::Elf_GAPS_enc<ELFT>> enclaves;
   ArrayRef<llvm::object::Elf_GAPS_cap<ELFT>> capabilities;

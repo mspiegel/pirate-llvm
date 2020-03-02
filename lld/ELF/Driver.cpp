@@ -1598,10 +1598,30 @@ static bool readGapsSection(InputSectionBase *s) {
     s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
   else if (s->name == ".gaps.strtab")
     s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
-  else
-    return false;
 
   return true;
+}
+
+template <typename ELFT>
+static bool readGapsResSection(InputSectionBase *s) {
+    StringRef type = s->name.drop_front(10); // Strip ".gaps.res."
+    auto resources = s->getDataAs<Elf_GAPS_res<ELFT>>();
+
+    for (const Elf_GAPS_res<ELFT> &res : resources) {
+      Symbol *sym = s->getFile<ELFT>()->getSymbols()[res.gr_sym];
+      if (sym->isDefined())
+        error("symbol '" + sym->getName() + "' cannot be redefined");
+      auto *bss = make<BssSection>(".gaps.bss", res.gr_size,
+                                   res.gr_align);
+      bss->file = sym->file;
+      bss->markLive();
+      inputSections.push_back(bss);
+      sym->replace(Defined{sym->file, sym->getName(), sym->binding,
+                           sym->stOther, sym->type, /*value=*/0,
+                           res.gr_size, bss});
+    }
+
+    return false;
 }
 
 // This function is where all the optimizations of link-time
@@ -1746,7 +1766,7 @@ void processGapsEnclave() {
       StringRef name = f->gaps.getStrtabEntry(e->enc_name);
 
       if (name.equals(config->enclave)) {
-        enclave = enclave ? enclave : new Enclave(config->enclave);
+        enclave = enclave ? enclave : make<Enclave>(config->enclave);
 
         if (enclave->main && e->enc_main)
           error("Multiple main function specified for enclave " + enclave->name);
@@ -2011,7 +2031,9 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
     }
 
     // Handle GAPS sections
-    if (!config->enclave.empty() && s->name.startswith(".gaps"))
+    if (s->name.startswith(".gaps.res"))
+      return readGapsResSection<ELFT>(s);
+    else if (!config->enclave.empty() && s->name.startswith(".gaps"))
       return readGapsSection<ELFT>(s);
 
     // We do not want to emit debug sections if --strip-all
