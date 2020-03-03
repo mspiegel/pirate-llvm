@@ -1588,15 +1588,15 @@ static Symbol *addUndefined(StringRef name) {
 
 template <typename ELFT>
 static bool readGapsSection(InputSectionBase *s) {
-  if (s->name == ".gaps.enclaves")
+  if (s->name == ".pirate.enclaves")
     s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>();
-  else if (s->name == ".gaps.symreqs")
+  else if (s->name == ".pirate.symreqs")
     s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>();
-  else if (s->name == ".gaps.capabilities")
+  else if (s->name == ".pirate.capabilities")
     s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>();
-  else if (s->name == ".gaps.captab")
+  else if (s->name == ".pirate.captab")
     s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
-  else if (s->name == ".gaps.strtab")
+  else if (s->name == ".pirate.strtab")
     s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
 
   return true;
@@ -1604,14 +1604,14 @@ static bool readGapsSection(InputSectionBase *s) {
 
 template <typename ELFT>
 static bool readGapsResSection(InputSectionBase *s) {
-    StringRef type = s->name.drop_front(10); // Strip ".gaps.res."
+    StringRef type = s->name.drop_front(10); // Strip ".pirate.res."
     auto resources = s->getDataAs<Elf_GAPS_res<ELFT>>();
 
     for (const Elf_GAPS_res<ELFT> &res : resources) {
       Symbol *sym = s->getFile<ELFT>()->getSymbols()[res.gr_sym];
       if (sym->isDefined())
         error("symbol '" + sym->getName() + "' cannot be redefined");
-      auto *bss = make<BssSection>(".gaps.bss", res.gr_size,
+      auto *bss = make<BssSection>(".pirate.bss", res.gr_size,
                                    res.gr_align);
       bss->file = sym->file;
       bss->markLive();
@@ -2031,9 +2031,9 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
     }
 
     // Handle GAPS sections
-    if (s->name.startswith(".gaps.res"))
+    if (s->name.startswith(".pirate.res"))
       return readGapsResSection<ELFT>(s);
-    else if (!config->enclave.empty() && s->name.startswith(".gaps"))
+    else if (!config->enclave.empty() && s->name.startswith(".pirate"))
       return readGapsSection<ELFT>(s);
 
     // We do not want to emit debug sections if --strip-all

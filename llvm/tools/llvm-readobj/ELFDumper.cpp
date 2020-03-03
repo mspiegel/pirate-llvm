@@ -1662,15 +1662,15 @@ ELFDumper<ELFT>::ELFDumper(const object::ELFObjectFile<ELFT> *ObjF,
       break;
     case ELF::SHT_PROGBITS:
       StringRef name = unwrapOrError(ObjF->getFileName(), Obj->getSectionName(&Sec));
-      if (name.equals(".gaps.enclaves"))
+      if (name.equals(".pirate.enclaves"))
         GapsEnclavesSec = &Sec;
-      else if (name.equals(".gaps.capabilities"))
+      else if (name.equals(".pirate.capabilities"))
         GapsCapabilitiesSec = &Sec;
-      else if (name.equals(".gaps.symreqs"))
+      else if (name.equals(".pirate.symreqs"))
         GapsSymreqsSec = &Sec;
-      else if (name.equals(".gaps.captab"))
+      else if (name.equals(".pirate.captab"))
         GapsCaptabSec = &Sec;
-      else if (name.equals(".gaps.strtab"))
+      else if (name.equals(".pirate.strtab"))
         GapsStrtabSec = &Sec;
       break;
     }
