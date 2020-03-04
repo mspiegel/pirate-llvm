@@ -1589,15 +1589,15 @@ static Symbol *addUndefined(StringRef name) {
 template <typename ELFT>
 static bool readPirateSection(InputSectionBase *s) {
   if (s->name == ".pirate.enclaves")
-    s->getFile<ELFT>()->pirate.enclaves = s->getDataAs<Elf_Pirate_enc<ELFT>>();
+    s->getFile<ELFT>()->pirate.enclaves.safeAssign(s->getDataAs<Elf_Pirate_enc<ELFT>>());
   else if (s->name == ".pirate.symreqs")
-    s->getFile<ELFT>()->pirate.symreqs = s->getDataAs<Elf_Pirate_req<ELFT>>();
+    s->getFile<ELFT>()->pirate.symreqs.safeAssign(s->getDataAs<Elf_Pirate_req<ELFT>>());
   else if (s->name == ".pirate.capabilities")
-    s->getFile<ELFT>()->pirate.capabilities = s->getDataAs<Elf_Pirate_cap<ELFT>>();
+    s->getFile<ELFT>()->pirate.capabilities.safeAssign(s->getDataAs<Elf_Pirate_cap<ELFT>>());
   else if (s->name == ".pirate.captab")
-    s->getFile<ELFT>()->pirate.captab = s->getDataAs<uint32_t>();
+    s->getFile<ELFT>()->pirate.captab.safeAssign(s->getDataAs<uint32_t>());
   else if (s->name == ".pirate.strtab")
-    s->getFile<ELFT>()->pirate.strtab = s->getDataAs<char>();
+    s->getFile<ELFT>()->pirate.strtab.safeAssign(s->getDataAs<char>());
 
   return true;
 }
@@ -1605,7 +1605,7 @@ static bool readPirateSection(InputSectionBase *s) {
 template <typename ELFT>
 static bool readPirateResSection(InputSectionBase *s) {
     auto resources = SafeArrayRef<Elf_Pirate_res<ELFT>>(s->name);
-    resources = s->getDataAs<Elf_Pirate_res<ELFT>>();
+    resources.safeAssign(s->getDataAs<Elf_Pirate_res<ELFT>>());
 
     for (const Elf_Pirate_res<ELFT> &res : resources) {
       Symbol *sym = s->getFile<ELFT>()->getSymbols()[res.gr_sym];

@@ -1967,15 +1967,15 @@ template <class ELFT> void ELFDumper<ELFT>::printPirateInfo() {
   Elf_Pirate_Impl<ELFT> Pirate;
 
   if (PirateEnclavesSec)
-    Pirate.enclaves = mkArray<ELFT,Elf_Pirate_enc<ELFT>>(ObjF, PirateEnclavesSec);
+    Pirate.enclaves.safeAssign(mkArray<ELFT,Elf_Pirate_enc<ELFT>>(ObjF, PirateEnclavesSec));
   if (PirateCapabilitiesSec)
-    Pirate.capabilities = mkArray<ELFT,Elf_Pirate_cap<ELFT>>(ObjF, PirateCapabilitiesSec);
+    Pirate.capabilities.safeAssign(mkArray<ELFT,Elf_Pirate_cap<ELFT>>(ObjF, PirateCapabilitiesSec));
   if (PirateSymreqsSec)
-    Pirate.symreqs = mkArray<ELFT,Elf_Pirate_req<ELFT>>(ObjF, PirateSymreqsSec);
+    Pirate.symreqs.safeAssign(mkArray<ELFT,Elf_Pirate_req<ELFT>>(ObjF, PirateSymreqsSec));
   if (PirateCaptabSec)
-    Pirate.captab = mkArray<ELFT,uint32_t>(ObjF, PirateCaptabSec);
+    Pirate.captab.safeAssign(mkArray<ELFT,uint32_t>(ObjF, PirateCaptabSec));
   if (PirateStrtabSec)
-    Pirate.strtab = mkArray<ELFT,char>(ObjF, PirateStrtabSec);
+    Pirate.strtab.safeAssign(mkArray<ELFT,char>(ObjF, PirateStrtabSec));
 
   ELFDumperStyle->printPirateInfo(ObjF, Pirate);
 }

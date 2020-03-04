@@ -65,7 +65,7 @@ public:
 
   // Assign the array once after checking that the source array is non-null
   // and performing checks for null-termination and initiation if requested
-  SafeArrayRef<T> &operator=(const ArrayRef<T> &src) {
+  SafeArrayRef<T> &safeAssign(const ArrayRef<T> &src) {
     if (this->data() != nullptr)
       report_fatal_error(name + " is multiply defined");
     if (src.data() == nullptr)
