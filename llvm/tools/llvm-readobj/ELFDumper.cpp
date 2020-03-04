@@ -37,6 +37,7 @@
 #include "llvm/Object/ELFTypes.h"
 #include "llvm/Object/Error.h"
 #include "llvm/Object/ObjectFile.h"
+#include "llvm/Object/PirateELFTypes.h"
 #include "llvm/Object/RelocationResolver.h"
 #include "llvm/Object/StackMapParser.h"
 #include "llvm/Support/AMDGPUMetadata.h"
@@ -1965,11 +1966,16 @@ ArrayRef<T> mkArray(const object::ELFObjectFile<ELFT> *ObjF,
 template <class ELFT> void ELFDumper<ELFT>::printGapsInfo() {
   Elf_GAPS_Impl<ELFT> Gaps;
 
-  Gaps.enclaves = mkArray<ELFT,Elf_GAPS_enc<ELFT>>(ObjF, GapsEnclavesSec);
-  Gaps.capabilities = mkArray<ELFT,Elf_GAPS_cap<ELFT>>(ObjF, GapsCapabilitiesSec);
-  Gaps.symreqs = mkArray<ELFT,Elf_GAPS_req<ELFT>>(ObjF, GapsSymreqsSec);
-  Gaps.captab = mkArray<ELFT,uint32_t>(ObjF, GapsCaptabSec);
-  Gaps.strtab = mkArray<ELFT,char>(ObjF, GapsStrtabSec);
+  if (GapsEnclavesSec)
+    Gaps.enclaves = mkArray<ELFT,Elf_GAPS_enc<ELFT>>(ObjF, GapsEnclavesSec);
+  if (GapsCapabilitiesSec)
+    Gaps.capabilities = mkArray<ELFT,Elf_GAPS_cap<ELFT>>(ObjF, GapsCapabilitiesSec);
+  if (GapsSymreqsSec)
+    Gaps.symreqs = mkArray<ELFT,Elf_GAPS_req<ELFT>>(ObjF, GapsSymreqsSec);
+  if (GapsCaptabSec)
+    Gaps.captab = mkArray<ELFT,uint32_t>(ObjF, GapsCaptabSec);
+  if (GapsStrtabSec)
+    Gaps.strtab = mkArray<ELFT,char>(ObjF, GapsStrtabSec);
 
   ELFDumperStyle->printGapsInfo(ObjF, Gaps);
 }

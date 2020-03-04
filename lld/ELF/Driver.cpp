@@ -1604,8 +1604,8 @@ static bool readGapsSection(InputSectionBase *s) {
 
 template <typename ELFT>
 static bool readGapsResSection(InputSectionBase *s) {
-    StringRef type = s->name.drop_front(10); // Strip ".pirate.res."
-    auto resources = s->getDataAs<Elf_GAPS_res<ELFT>>();
+    auto resources = SafeArrayRef<Elf_GAPS_res<ELFT>>(s->name);
+    resources = s->getDataAs<Elf_GAPS_res<ELFT>>();
 
     for (const Elf_GAPS_res<ELFT> &res : resources) {
       Symbol *sym = s->getFile<ELFT>()->getSymbols()[res.gr_sym];
@@ -1762,19 +1762,22 @@ void processGapsEnclave() {
     if (!f)
       continue;
 
-    for (auto e = f->gaps.enclaves.begin() + 1; e < f->gaps.enclaves.end(); ++e) {
-      StringRef name = f->gaps.getStrtabEntry(e->enc_name);
+    for (const Elf_GAPS_enc<ELFT> &e : f->gaps.enclaves) {
+      if (!e.enc_name) // Initial empty enclave (ENC_UNDEF)
+        continue;
+
+      StringRef name = f->gaps.getStrtabEntry(e.enc_name);
 
       if (name.equals(config->enclave)) {
         enclave = enclave ? enclave : make<Enclave>(config->enclave);
 
-        if (enclave->main && e->enc_main)
+        if (enclave->main && e.enc_main)
           error("Multiple main function specified for enclave " + enclave->name);
         else
-          enclave->main = &f->getSymbol(e->enc_main);
+          enclave->main = &f->getSymbol(e.enc_main);
 
         std::vector<StringRef> caps;
-        f->gaps.getSuppliedCaps(e->enc_cap, caps);
+        f->gaps.getSuppliedCaps(e.enc_cap, caps);
         enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
       }
     }

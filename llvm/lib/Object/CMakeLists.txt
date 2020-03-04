@@ -17,6 +17,7 @@ add_llvm_library(LLVMObject
   ModuleSymbolTable.cpp
   Object.cpp
   ObjectFile.cpp
+  PirateELFTypes.cpp
   RecordStreamer.cpp
   RelocationResolver.cpp
   SymbolicFile.cpp
