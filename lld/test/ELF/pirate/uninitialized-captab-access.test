@@ -10,14 +10,11 @@ FileHeader:
 Sections:
     - Name:         .pirate.symreqs
       Type:         SHT_PROGBITS
-      Content:      "000000000100000001000000"
-    - Name:         .pirate.captab
-      Type:         SHT_PROGBITS
-      Content:      "00000000"
+      Content:      "010000000000000001000000"
 Symbols:
     - Name:         blah
       Binding:      STB_GLOBAL
 
-# CHECK: uninitialized access to .pirate.enclaves
+# CHECK: uninitialized access to .pirate.captab
 
 # vim: set filetype=yaml:

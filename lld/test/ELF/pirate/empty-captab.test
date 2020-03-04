@@ -8,16 +8,10 @@ FileHeader:
     Type:           ET_REL
     Machine:        EM_X86_64
 Sections:
-    - Name:         .pirate.symreqs
-      Type:         SHT_PROGBITS
-      Content:      "000000000100000001000000"
     - Name:         .pirate.captab
       Type:         SHT_PROGBITS
-      Content:      "00000000"
-Symbols:
-    - Name:         blah
-      Binding:      STB_GLOBAL
+      Content:      ""
 
-# CHECK: uninitialized access to .pirate.enclaves
+# CHECK: .pirate.captab does not have a null initial element
 
 # vim: set filetype=yaml:
