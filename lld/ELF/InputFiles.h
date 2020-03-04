@@ -40,7 +40,7 @@ std::string toString(const elf::InputFile *f);
 namespace elf {
 class InputFile;
 class InputSectionBase;
-template <typename ELFT> class Elf_GAPS_Impl;
+template <typename ELFT> class Elf_Pirate_Impl;
 
 using llvm::object::Archive;
 
@@ -251,7 +251,7 @@ public:
   // SHT_LLVM_CALL_GRAPH_PROFILE table
   ArrayRef<Elf_CGProfile> cgProfile;
 
-  llvm::object::Elf_GAPS_Impl<ELFT> gaps;
+  llvm::object::Elf_Pirate_Impl<ELFT> pirate;
 
 private:
   void initializeSections(bool ignoreComdats);

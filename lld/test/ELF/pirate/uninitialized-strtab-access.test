@@ -8,10 +8,10 @@ FileHeader:
     Type:           ET_REL
     Machine:        EM_X86_64
 Sections:
-    - Name:         .gaps.enclaves
+    - Name:         .pirate.enclaves
       Type:         SHT_PROGBITS
       Content:      "0000000000000000000000000000000001000000000000000000000000000000"
 
-# CHECK: uninitialized access to .gaps.strtab
+# CHECK: uninitialized access to .pirate.strtab
 
 # vim: set filetype=yaml:

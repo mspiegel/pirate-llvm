@@ -188,7 +188,7 @@ public:
   void printELFLinkerOptions() override;
   void printStackSizes() override;
 
-  void printGapsInfo() override;
+  void printPirateInfo() override;
 
   const object::ELFObjectFile<ELFT> *getElfObject() const { return ObjF; };
 
@@ -253,11 +253,11 @@ private:
   const Elf_Shdr *SymbolVersionNeedSection = nullptr; // .gnu.version_r
   const Elf_Shdr *SymbolVersionDefSection = nullptr; // .gnu.version_d
 
-  const Elf_Shdr *GapsEnclavesSec = nullptr;
-  const Elf_Shdr *GapsSymreqsSec = nullptr;
-  const Elf_Shdr *GapsCapabilitiesSec = nullptr;
-  const Elf_Shdr *GapsCaptabSec = nullptr;
-  const Elf_Shdr *GapsStrtabSec = nullptr;
+  const Elf_Shdr *PirateEnclavesSec = nullptr;
+  const Elf_Shdr *PirateSymreqsSec = nullptr;
+  const Elf_Shdr *PirateCapabilitiesSec = nullptr;
+  const Elf_Shdr *PirateCaptabSec = nullptr;
+  const Elf_Shdr *PirateStrtabSec = nullptr;
 
   // Records for each version index the corresponding Verdef or Vernaux entry.
   // This is filled the first time LoadVersionMap() is called.
@@ -424,8 +424,8 @@ public:
   virtual void printNotes(const ELFFile<ELFT> *Obj) = 0;
   virtual void printELFLinkerOptions(const ELFFile<ELFT> *Obj) = 0;
   virtual void printStackSizes(const ELFObjectFile<ELFT> *Obj) = 0;
-  virtual void printGapsInfo(const ELFObjectFile<ELFT> *Obj,
-                             const Elf_GAPS_Impl<ELFT> &Gaps) = 0;
+  virtual void printPirateInfo(const ELFObjectFile<ELFT> *Obj,
+                             const Elf_Pirate_Impl<ELFT> &Pirate) = 0;
   void printNonRelocatableStackSizes(const ELFObjectFile<ELFT> *Obj,
                                      std::function<void()> PrintHeader);
   void printRelocatableStackSizes(const ELFObjectFile<ELFT> *Obj,
@@ -493,8 +493,8 @@ public:
   void printELFLinkerOptions(const ELFFile<ELFT> *Obj) override;
   void printStackSizes(const ELFObjectFile<ELFT> *Obj) override;
   void printStackSizeEntry(uint64_t Size, StringRef FuncName) override;
-  void printGapsInfo(const ELFObjectFile<ELFT> *Obj,
-                     const Elf_GAPS_Impl<ELFT> &Gaps) override;
+  void printPirateInfo(const ELFObjectFile<ELFT> *Obj,
+                     const Elf_Pirate_Impl<ELFT> &Pirate) override;
   void printMipsGOT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsPLT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsABIFlags(const ELFObjectFile<ELFT> *Obj) override;
@@ -610,8 +610,8 @@ public:
   void printELFLinkerOptions(const ELFFile<ELFT> *Obj) override;
   void printStackSizes(const ELFObjectFile<ELFT> *Obj) override;
   void printStackSizeEntry(uint64_t Size, StringRef FuncName) override;
-  void printGapsInfo(const ELFObjectFile<ELFT> *Obj,
-                     const Elf_GAPS_Impl<ELFT> &Gaps) override;
+  void printPirateInfo(const ELFObjectFile<ELFT> *Obj,
+                     const Elf_Pirate_Impl<ELFT> &Pirate) override;
   void printMipsGOT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsPLT(const MipsGOTParser<ELFT> &Parser) override;
   void printMipsABIFlags(const ELFObjectFile<ELFT> *Obj) override;
@@ -1664,15 +1664,15 @@ ELFDumper<ELFT>::ELFDumper(const object::ELFObjectFile<ELFT> *ObjF,
     case ELF::SHT_PROGBITS:
       StringRef name = unwrapOrError(ObjF->getFileName(), Obj->getSectionName(&Sec));
       if (name.equals(".pirate.enclaves"))
-        GapsEnclavesSec = &Sec;
+        PirateEnclavesSec = &Sec;
       else if (name.equals(".pirate.capabilities"))
-        GapsCapabilitiesSec = &Sec;
+        PirateCapabilitiesSec = &Sec;
       else if (name.equals(".pirate.symreqs"))
-        GapsSymreqsSec = &Sec;
+        PirateSymreqsSec = &Sec;
       else if (name.equals(".pirate.captab"))
-        GapsCaptabSec = &Sec;
+        PirateCaptabSec = &Sec;
       else if (name.equals(".pirate.strtab"))
-        GapsStrtabSec = &Sec;
+        PirateStrtabSec = &Sec;
       break;
     }
   }
@@ -1963,21 +1963,21 @@ ArrayRef<T> mkArray(const object::ELFObjectFile<ELFT> *ObjF,
     return {(T *)NULL, (size_t)0};
 }
 
-template <class ELFT> void ELFDumper<ELFT>::printGapsInfo() {
-  Elf_GAPS_Impl<ELFT> Gaps;
+template <class ELFT> void ELFDumper<ELFT>::printPirateInfo() {
+  Elf_Pirate_Impl<ELFT> Pirate;
 
-  if (GapsEnclavesSec)
-    Gaps.enclaves = mkArray<ELFT,Elf_GAPS_enc<ELFT>>(ObjF, GapsEnclavesSec);
-  if (GapsCapabilitiesSec)
-    Gaps.capabilities = mkArray<ELFT,Elf_GAPS_cap<ELFT>>(ObjF, GapsCapabilitiesSec);
-  if (GapsSymreqsSec)
-    Gaps.symreqs = mkArray<ELFT,Elf_GAPS_req<ELFT>>(ObjF, GapsSymreqsSec);
-  if (GapsCaptabSec)
-    Gaps.captab = mkArray<ELFT,uint32_t>(ObjF, GapsCaptabSec);
-  if (GapsStrtabSec)
-    Gaps.strtab = mkArray<ELFT,char>(ObjF, GapsStrtabSec);
+  if (PirateEnclavesSec)
+    Pirate.enclaves = mkArray<ELFT,Elf_Pirate_enc<ELFT>>(ObjF, PirateEnclavesSec);
+  if (PirateCapabilitiesSec)
+    Pirate.capabilities = mkArray<ELFT,Elf_Pirate_cap<ELFT>>(ObjF, PirateCapabilitiesSec);
+  if (PirateSymreqsSec)
+    Pirate.symreqs = mkArray<ELFT,Elf_Pirate_req<ELFT>>(ObjF, PirateSymreqsSec);
+  if (PirateCaptabSec)
+    Pirate.captab = mkArray<ELFT,uint32_t>(ObjF, PirateCaptabSec);
+  if (PirateStrtabSec)
+    Pirate.strtab = mkArray<ELFT,char>(ObjF, PirateStrtabSec);
 
-  ELFDumperStyle->printGapsInfo(ObjF, Gaps);
+  ELFDumperStyle->printPirateInfo(ObjF, Pirate);
 }
 
 #define LLVM_READOBJ_DT_FLAG_ENT(prefix, enum)                                 \
@@ -5087,13 +5087,13 @@ void GNUStyle<ELFT>::printStackSizes(const ELFObjectFile<ELFT> *Obj) {
 }
 
 template <class ELFT>
-void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
-                                   const Elf_GAPS_Impl<ELFT> &Gaps) {
+void GNUStyle<ELFT>::printPirateInfo(const ELFObjectFile<ELFT> *ObjF,
+                                   const Elf_Pirate_Impl<ELFT> &Pirate) {
   auto Symbols = ObjF->symbols();
   auto Symtab = std::vector<elf_symbol_iterator>(Symbols.begin(), Symbols.end());
 
   auto PrintEnclavesHeader = [&]() {
-    OS << "\nGAPS Enclaves:\n";
+    OS << "\nPirate Enclaves:\n";
     OS.PadToColumn(8);
     OS << "Name";
     OS.PadToColumn(30);
@@ -5102,12 +5102,12 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
     OS << "Capabilities\n";
   };
 
-  auto PrintEnclave = [&](const Elf_GAPS_enc<ELFT> &Enc) {
+  auto PrintEnclave = [&](const Elf_Pirate_enc<ELFT> &Enc) {
     static uint32_t i = 0;
 
     std::string EncName = to_string(format_decimal(Enc.enc_name, 1));
     if (Enc.enc_name)
-      EncName = to_string(Gaps.getStrtabEntry(Enc.enc_name));
+      EncName = to_string(Pirate.getStrtabEntry(Enc.enc_name));
 
     std::string MainSym = to_string(format_decimal(Enc.enc_main, 1));
     if (Enc.enc_main) {
@@ -5118,11 +5118,11 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
     std::string CapList = to_string(format_decimal(Enc.enc_cap, 1));
     if (Enc.enc_cap) {
       CapList += ": ";
-      for (uint32_t i = Enc.enc_cap; Gaps.captab[i]; ++i) {
-        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[i]];
-        CapList += to_string(Gaps.getStrtabEntry(Cap.cap_name));
-        CapList += " (" + to_string(Gaps.captab[i]) + ")";
-        if (Gaps.captab[i+1])
+      for (uint32_t i = Enc.enc_cap; Pirate.captab[i]; ++i) {
+        const Elf_Pirate_cap<ELFT> &Cap = Pirate.capabilities[Pirate.captab[i]];
+        CapList += to_string(Pirate.getStrtabEntry(Cap.cap_name));
+        CapList += " (" + to_string(Pirate.captab[i]) + ")";
+        if (Pirate.captab[i+1])
           CapList += ", ";
       }
     }
@@ -5138,7 +5138,7 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
   };
 
   auto PrintSymreqsHeader = [&]() {
-    OS << "\nGAPS Requirements:\n";
+    OS << "\nPirate Requirements:\n";
     OS.PadToColumn(2);
     OS << "Symbol";
     OS.PadToColumn(24);
@@ -5147,7 +5147,7 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
     OS << "Capabilities\n";
   };
 
-  auto PrintSymreq = [&](const Elf_GAPS_req<ELFT> &Req) {
+  auto PrintSymreq = [&](const Elf_Pirate_req<ELFT> &Req) {
     std::string Sym = to_string(format_decimal(Req.req_sym, 1));
     if (Req.req_sym) {
       Expected<StringRef> Name = Symtab[Req.req_sym - 1]->getName();
@@ -5156,18 +5156,18 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
 
     std::string EncName = to_string(format_decimal(Req.req_enc, 1));
     if (Req.req_enc) {
-      Elf_GAPS_enc<ELFT> Enc = Gaps.enclaves[Req.req_enc];
-      EncName = to_string(Gaps.getStrtabEntry(Enc.enc_name)) + " (" + EncName + ")";
+      Elf_Pirate_enc<ELFT> Enc = Pirate.enclaves[Req.req_enc];
+      EncName = to_string(Pirate.getStrtabEntry(Enc.enc_name)) + " (" + EncName + ")";
     }
 
     std::string CapList = to_string(format_decimal(Req.req_cap, 1));
     if (Req.req_cap) {
       CapList.clear();
-      for (uint32_t i = Req.req_cap; Gaps.captab[i]; ++i) {
-        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[i]];
-        CapList += to_string(Gaps.getStrtabEntry(Cap.cap_name));
-        CapList += " (" + to_string(Gaps.captab[i]) + ")";
-        if (Gaps.captab[i+1])
+      for (uint32_t i = Req.req_cap; Pirate.captab[i]; ++i) {
+        const Elf_Pirate_cap<ELFT> &Cap = Pirate.capabilities[Pirate.captab[i]];
+        CapList += to_string(Pirate.getStrtabEntry(Cap.cap_name));
+        CapList += " (" + to_string(Pirate.captab[i]) + ")";
+        if (Pirate.captab[i+1])
           CapList += ", ";
       }
     }
@@ -5181,22 +5181,22 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
   };
 
   auto PrintCapsHeader = [&]() {
-    OS << "\nGAPS Capabilities\n";
+    OS << "\nPirate Capabilities\n";
     OS.PadToColumn(8);
     OS << "Name";
     OS.PadToColumn(30);
     OS << "Parent" << "\n";
   };
 
-  auto PrintCap = [&](const Elf_GAPS_cap<ELFT> &Cap) {
+  auto PrintCap = [&](const Elf_Pirate_cap<ELFT> &Cap) {
     static uint32_t i = 0;
 
-    std::string Name = Gaps.getStrtabEntry(Cap.cap_name);
+    std::string Name = Pirate.getStrtabEntry(Cap.cap_name);
 
     std::string Parent = to_string(Cap.cap_parent);
     if (Cap.cap_parent) {
-      const auto &ParentCap = Gaps.capabilities[Cap.cap_parent];
-      Parent = to_string(Gaps.getStrtabEntry(ParentCap.cap_name)) + " (" + Parent + ")";
+      const auto &ParentCap = Pirate.capabilities[Cap.cap_parent];
+      Parent = to_string(Pirate.getStrtabEntry(ParentCap.cap_name)) + " (" + Parent + ")";
     }
 
     OS.PadToColumn(2);
@@ -5207,25 +5207,25 @@ void GNUStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
     OS << Parent << "\n";
   };
 
-  if (Gaps.enclaves.empty()) {
-    OS << "There are no GAPS enclaves in this file\n";
+  if (Pirate.enclaves.empty()) {
+    OS << "There are no Pirate enclaves in this file\n";
   } else {
     PrintEnclavesHeader();
-    for (const Elf_GAPS_enc<ELFT> &Enc : Gaps.enclaves)
+    for (const Elf_Pirate_enc<ELFT> &Enc : Pirate.enclaves)
       PrintEnclave(Enc);
   }
-  if (Gaps.symreqs.empty()) {
-    OS << "There are no GAPS symbol requirements in this file\n";
+  if (Pirate.symreqs.empty()) {
+    OS << "There are no Pirate symbol requirements in this file\n";
   } else {
     PrintSymreqsHeader();
-    for (const Elf_GAPS_req<ELFT> &Req : Gaps.symreqs)
+    for (const Elf_Pirate_req<ELFT> &Req : Pirate.symreqs)
       PrintSymreq(Req);
   }
-  if (Gaps.capabilities.empty()) {
-    OS << "There are no GAPS capabilities in this file\n";
+  if (Pirate.capabilities.empty()) {
+    OS << "There are no Pirate capabilities in this file\n";
   } else {
     PrintCapsHeader();
-    for (const Elf_GAPS_cap<ELFT> &Cap : Gaps.capabilities)
+    for (const Elf_Pirate_cap<ELFT> &Cap : Pirate.capabilities)
       PrintCap(Cap);
   }
 }
@@ -6249,21 +6249,21 @@ void LLVMStyle<ELFT>::printStackSizeEntry(uint64_t Size, StringRef FuncName) {
 }
 
 template <class ELFT>
-void LLVMStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
-                                    const Elf_GAPS_Impl<ELFT> &Gaps) {
+void LLVMStyle<ELFT>::printPirateInfo(const ELFObjectFile<ELFT> *ObjF,
+                                    const Elf_Pirate_Impl<ELFT> &Pirate) {
   auto Symbols = ObjF->symbols();
   auto Symtab = std::vector<elf_symbol_iterator>(Symbols.begin(), Symbols.end());
 
-  DictScope D(W, "GAPS Info");
+  DictScope D(W, "Pirate Info");
   {
     ListScope L(W, "Enclaves");
 
-    for (size_t i = 0; i < Gaps.enclaves.size(); ++i) {
-      const Elf_GAPS_enc<ELFT> &Enc = Gaps.enclaves[i];
+    for (size_t i = 0; i < Pirate.enclaves.size(); ++i) {
+      const Elf_Pirate_enc<ELFT> &Enc = Pirate.enclaves[i];
 
       std::string EncName = to_string(format_decimal(Enc.enc_name, 1));
       if (Enc.enc_name)
-        EncName = "(" + to_string(i) + ") " + to_string(Gaps.getStrtabEntry(Enc.enc_name));
+        EncName = "(" + to_string(i) + ") " + to_string(Pirate.getStrtabEntry(Enc.enc_name));
 
       DictScope D(W, "Enclave " + EncName);
 
@@ -6277,17 +6277,17 @@ void LLVMStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
 
       ListScope L(W, "Capabilities");
 
-      for (size_t j = Enc.enc_cap; Gaps.captab[j]; ++j) {
-        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[j]];
-        W.startLine() << to_string(Gaps.getStrtabEntry(Cap.cap_name)) +
-            " (" + to_string(Gaps.captab[j]) + ")\n";
+      for (size_t j = Enc.enc_cap; Pirate.captab[j]; ++j) {
+        const Elf_Pirate_cap<ELFT> &Cap = Pirate.capabilities[Pirate.captab[j]];
+        W.startLine() << to_string(Pirate.getStrtabEntry(Cap.cap_name)) +
+            " (" + to_string(Pirate.captab[j]) + ")\n";
       }
     }
   }
   {
     ListScope L(W, "Symreqs");
 
-    for (const Elf_GAPS_req<ELFT> &Req : Gaps.symreqs) {
+    for (const Elf_Pirate_req<ELFT> &Req : Pirate.symreqs) {
       std::string Sym = to_string(format_decimal(Req.req_sym, 1));
       if (Req.req_sym) {
         Expected<StringRef> Name = Symtab[Req.req_sym - 1]->getName();
@@ -6298,36 +6298,36 @@ void LLVMStyle<ELFT>::printGapsInfo(const ELFObjectFile<ELFT> *ObjF,
 
       std::string EncName = to_string(format_decimal(Req.req_enc, 1));
       if (Req.req_enc) {
-        Elf_GAPS_enc<ELFT> Enc = Gaps.enclaves[Req.req_enc];
-        EncName = to_string(Gaps.getStrtabEntry(Enc.enc_name)) + " (" + EncName + ")";
+        Elf_Pirate_enc<ELFT> Enc = Pirate.enclaves[Req.req_enc];
+        EncName = to_string(Pirate.getStrtabEntry(Enc.enc_name)) + " (" + EncName + ")";
       }
 
       W.printString("Enclave", EncName);
 
       ListScope L(W, "Capabilities");
 
-      for (uint32_t j = Req.req_cap; Gaps.captab[j]; ++j) {
-        const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[Gaps.captab[j]];
-        W.startLine() << to_string(Gaps.getStrtabEntry(Cap.cap_name)) +
-            " (" + to_string(Gaps.captab[j]) + ")\n";
+      for (uint32_t j = Req.req_cap; Pirate.captab[j]; ++j) {
+        const Elf_Pirate_cap<ELFT> &Cap = Pirate.capabilities[Pirate.captab[j]];
+        W.startLine() << to_string(Pirate.getStrtabEntry(Cap.cap_name)) +
+            " (" + to_string(Pirate.captab[j]) + ")\n";
       }
     }
   }
   {
     ListScope L(W, "Capabilities");
-    for (size_t i = 0; i < Gaps.capabilities.size(); ++i) {
-      const Elf_GAPS_cap<ELFT> &Cap = Gaps.capabilities[i];
+    for (size_t i = 0; i < Pirate.capabilities.size(); ++i) {
+      const Elf_Pirate_cap<ELFT> &Cap = Pirate.capabilities[i];
 
       std::string Name = to_string(i);
       if (i)
-        Name = "(" + Name + ") " + to_string(Gaps.getStrtabEntry(Cap.cap_name));
+        Name = "(" + Name + ") " + to_string(Pirate.getStrtabEntry(Cap.cap_name));
 
       DictScope D(W, "Capability " + Name);
 
       std::string Parent = to_string(Cap.cap_parent);
       if (Cap.cap_parent) {
-        const auto &ParentCap = Gaps.capabilities[Cap.cap_parent];
-        Parent = to_string(Gaps.getStrtabEntry(ParentCap.cap_name)) + " (" + Parent + ")";
+        const auto &ParentCap = Pirate.capabilities[Cap.cap_parent];
+        Parent = to_string(Pirate.getStrtabEntry(ParentCap.cap_name)) + " (" + Parent + ")";
       }
 
       W.printString("Parent", Parent);

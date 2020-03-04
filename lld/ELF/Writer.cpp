@@ -287,15 +287,6 @@ void addReservedSymbols() {
   if (script->hasSectionsCommand)
     return;
 
-  //for (SectionBase *sec : outputSections) {
-  //  if (sec->name.startswith(".gaps.res")) {
-  //    StringRef type = sec->name.drop_front(10); // Strip ".gaps.res."
-  //    std::string *sname = make<std::string>("__" + type.str() + "_gaps_resources");
-
-  //    addOptionalRegular(*sname, sec, 0, STV_DEFAULT);
-  //  }
-  //}
-
   auto add = [](StringRef s, int64_t pos) {
     return addOptionalRegular(s, Out::elfHeader, pos, STV_DEFAULT);
   };
@@ -2022,7 +2013,7 @@ void Writer<ELFT>::addStartStopSymbols(OutputSection *sec) {
   StringRef s = sec->name;
   std::string buf;
 
-  if (s.startswith(".gaps.res.")) {
+  if (s.startswith(".pirate.res.")) {
     buf = s.drop_front(1);
     for (char &c : buf)
       c = c == '.' ? '_' : c;

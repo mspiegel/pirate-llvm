@@ -8,9 +8,9 @@ FileHeader:
     Type:           ET_REL
     Machine:        EM_X86_64
 Sections:
-    - Name:         .gaps.enclaves
+    - Name:         .pirate.enclaves
       Type:         SHT_NOBITS
 
-# CHECK: .gaps.enclaves contains null data
+# CHECK: .pirate.enclaves contains null data
 
 # vim: set filetype=yaml:

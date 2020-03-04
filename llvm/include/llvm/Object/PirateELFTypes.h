@@ -14,7 +14,7 @@
 namespace llvm {
 namespace object {
 
-template <class ELFT> struct Elf_GAPS_enc {
+template <class ELFT> struct Elf_Pirate_enc {
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
   Elf_Addr enc_name;
   Elf_Word enc_cap;
@@ -22,7 +22,7 @@ template <class ELFT> struct Elf_GAPS_enc {
   Elf_Half enc_padding;
 };
 
-template <class ELFT> struct Elf_GAPS_req {
+template <class ELFT> struct Elf_Pirate_req {
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
   Elf_Word req_cap;
   Elf_Word req_enc;
@@ -30,14 +30,14 @@ template <class ELFT> struct Elf_GAPS_req {
   Elf_Half req_padding;
 };
 
-template <class ELFT> struct Elf_GAPS_cap {
+template <class ELFT> struct Elf_Pirate_cap {
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
   Elf_Addr cap_name;
   Elf_Word cap_parent;
   Elf_Word cap_padding;
 };
 
-template <class ELFT> struct Elf_GAPS_res {
+template <class ELFT> struct Elf_Pirate_res {
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
   Elf_Addr gr_name;
   Elf_Addr gr_obj;
@@ -94,19 +94,19 @@ template <> bool SafeArrayRef<char>::isNull(char c);
 
 template <> bool SafeArrayRef<uint32_t>::isNull(uint32_t n);
 
-template <typename ELFT> struct Elf_GAPS_Impl {
-  SafeArrayRef<Elf_GAPS_enc<ELFT>> enclaves;
-  SafeArrayRef<Elf_GAPS_cap<ELFT>> capabilities;
-  SafeArrayRef<Elf_GAPS_req<ELFT>> symreqs;
+template <typename ELFT> struct Elf_Pirate_Impl {
+  SafeArrayRef<Elf_Pirate_enc<ELFT>> enclaves;
+  SafeArrayRef<Elf_Pirate_cap<ELFT>> capabilities;
+  SafeArrayRef<Elf_Pirate_req<ELFT>> symreqs;
   SafeArrayRef<uint32_t> captab;
   SafeArrayRef<char> strtab;
 
-  Elf_GAPS_Impl() :
-    enclaves(".gaps.enclaves", true),
-    capabilities(".gaps.capabilities", true),
-    symreqs(".gaps.symreqs"),
-    captab(".gaps.captab", true, true),
-    strtab(".gaps.strtab", true, true)
+  Elf_Pirate_Impl() :
+    enclaves(".pirate.enclaves", true),
+    capabilities(".pirate.capabilities", true),
+    symreqs(".pirate.symreqs"),
+    captab(".pirate.captab", true, true),
+    strtab(".pirate.strtab", true, true)
     {};
 
   StringRef getStrtabEntry(typename ELFT::Addr offset) const {
