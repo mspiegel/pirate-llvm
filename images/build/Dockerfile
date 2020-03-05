@@ -2,6 +2,7 @@
 # tools.  We include sphinx as that is needed for documentatiob.
 FROM ubuntu:latest
 MAINTAINER Joe Hendrix (jhendrix@galois.com)
+WORKDIR /root
 
 RUN apt-get update \
  && apt-get install --no-install-recommends -y \
