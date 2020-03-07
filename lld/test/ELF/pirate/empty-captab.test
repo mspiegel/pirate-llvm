@@ -1,0 +1,17 @@
+# RUN: yaml2obj %s -o %t
+# RUN: not ld.lld -enclave foo %t -o /dev/null 2>&1 | FileCheck %s
+
+!ELF
+FileHeader:
+    Class:          ELFCLASS64
+    Data:           ELFDATA2LSB
+    Type:           ET_REL
+    Machine:        EM_X86_64
+Sections:
+    - Name:         .pirate.captab
+      Type:         SHT_PROGBITS
+      Content:      ""
+
+# CHECK: .pirate.captab does not have a null initial element
+
+# vim: set filetype=yaml:

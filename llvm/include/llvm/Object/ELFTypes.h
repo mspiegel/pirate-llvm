@@ -757,66 +757,6 @@ template <class ELFT> struct Elf_Mips_ABIFlags {
   Elf_Word flags2;   // General flags
 };
 
-template <class ELFT> struct Elf_GAPS_enc {
-  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
-  Elf_Addr enc_name;
-  Elf_Word enc_cap;
-  Elf_Half enc_main;
-  Elf_Half enc_padding;
-};
-
-template <class ELFT> struct Elf_GAPS_req {
-  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
-  Elf_Word req_cap;
-  Elf_Word req_enc;
-  Elf_Half req_sym;
-  Elf_Half req_padding;
-};
-
-template <class ELFT> struct Elf_GAPS_cap {
-  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
-  Elf_Addr cap_name;
-  Elf_Word cap_parent;
-  Elf_Word cap_padding;
-};
-
-template <class ELFT> struct Elf_GAPS_res {
-  LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
-  Elf_Addr gr_name;
-  Elf_Addr gr_obj;
-  Elf_Addr gr_params;
-  Elf_Word gr_size;
-  Elf_Half gr_align;
-  Elf_Half gr_sym;
-};
-
-template <typename ELFT> struct Elf_GAPS_Impl {
-  ArrayRef<llvm::object::Elf_GAPS_enc<ELFT>> enclaves;
-  ArrayRef<llvm::object::Elf_GAPS_cap<ELFT>> capabilities;
-  ArrayRef<llvm::object::Elf_GAPS_req<ELFT>> symreqs;
-  ArrayRef<uint32_t> captab;
-  ArrayRef<char> strtab;
-
-  StringRef getStrtabEntry(typename ELFT::Addr offset) const {
-    auto entry = strtab.data() + offset;
-    auto size = strlen(entry);
-    return {entry, size};
-  }
-
-  void getSuppliedCaps(typename ELFT::Word offset, std::vector<StringRef> &out) const {
-    out.clear();
-    for (uint32_t i = offset; captab[i]; ++i)
-      for (uint32_t j = captab[i]; j; j = capabilities[j].cap_parent)
-        out.emplace_back(getStrtabEntry(capabilities[j].cap_name));
-  }
-
-  void getRequiredCaps(typename ELFT::Word offset, std::vector<StringRef> &out) const {
-    out.clear();
-    for (uint32_t i = offset; captab[i]; ++i)
-      out.emplace_back(getStrtabEntry(capabilities[captab[i]].cap_name));
-  }
-};
-
 } // end namespace object.
 } // end namespace llvm.
 

@@ -21,6 +21,7 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/IRObjectFile.h"
+#include "llvm/Object/PirateELFTypes.h"
 #include "llvm/Support/Threading.h"
 #include <map>
 
@@ -39,6 +40,7 @@ std::string toString(const elf::InputFile *f);
 namespace elf {
 class InputFile;
 class InputSectionBase;
+template <typename ELFT> class Elf_Pirate_Impl;
 
 using llvm::object::Archive;
 
@@ -249,7 +251,7 @@ public:
   // SHT_LLVM_CALL_GRAPH_PROFILE table
   ArrayRef<Elf_CGProfile> cgProfile;
 
-  llvm::object::Elf_GAPS_Impl<ELFT> gaps;
+  llvm::object::Elf_Pirate_Impl<ELFT> pirate;
 
 private:
   void initializeSections(bool ignoreComdats);

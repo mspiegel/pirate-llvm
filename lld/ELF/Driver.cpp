@@ -1587,31 +1587,31 @@ static Symbol *addUndefined(StringRef name) {
 }
 
 template <typename ELFT>
-static bool readGapsSection(InputSectionBase *s) {
-  if (s->name == ".gaps.enclaves")
-    s->getFile<ELFT>()->gaps.enclaves = s->getDataAs<Elf_GAPS_enc<ELFT>>();
-  else if (s->name == ".gaps.symreqs")
-    s->getFile<ELFT>()->gaps.symreqs = s->getDataAs<Elf_GAPS_req<ELFT>>();
-  else if (s->name == ".gaps.capabilities")
-    s->getFile<ELFT>()->gaps.capabilities = s->getDataAs<Elf_GAPS_cap<ELFT>>();
-  else if (s->name == ".gaps.captab")
-    s->getFile<ELFT>()->gaps.captab = s->getDataAs<uint32_t>();
-  else if (s->name == ".gaps.strtab")
-    s->getFile<ELFT>()->gaps.strtab = s->getDataAs<char>();
+static bool readPirateSection(InputSectionBase *s) {
+  if (s->name == ".pirate.enclaves")
+    s->getFile<ELFT>()->pirate.enclaves.safeAssign(s->getDataAs<Elf_Pirate_enc<ELFT>>());
+  else if (s->name == ".pirate.symreqs")
+    s->getFile<ELFT>()->pirate.symreqs.safeAssign(s->getDataAs<Elf_Pirate_req<ELFT>>());
+  else if (s->name == ".pirate.capabilities")
+    s->getFile<ELFT>()->pirate.capabilities.safeAssign(s->getDataAs<Elf_Pirate_cap<ELFT>>());
+  else if (s->name == ".pirate.captab")
+    s->getFile<ELFT>()->pirate.captab.safeAssign(s->getDataAs<uint32_t>());
+  else if (s->name == ".pirate.strtab")
+    s->getFile<ELFT>()->pirate.strtab.safeAssign(s->getDataAs<char>());
 
   return true;
 }
 
 template <typename ELFT>
-static bool readGapsResSection(InputSectionBase *s) {
-    StringRef type = s->name.drop_front(10); // Strip ".gaps.res."
-    auto resources = s->getDataAs<Elf_GAPS_res<ELFT>>();
+static bool readPirateResSection(InputSectionBase *s) {
+    auto resources = SafeArrayRef<Elf_Pirate_res<ELFT>>(s->name);
+    resources.safeAssign(s->getDataAs<Elf_Pirate_res<ELFT>>());
 
-    for (const Elf_GAPS_res<ELFT> &res : resources) {
+    for (const Elf_Pirate_res<ELFT> &res : resources) {
       Symbol *sym = s->getFile<ELFT>()->getSymbols()[res.gr_sym];
       if (sym->isDefined())
         error("symbol '" + sym->getName() + "' cannot be redefined");
-      auto *bss = make<BssSection>(".gaps.bss", res.gr_size,
+      auto *bss = make<BssSection>(".pirate.bss", res.gr_size,
                                    res.gr_align);
       bss->file = sym->file;
       bss->markLive();
@@ -1756,25 +1756,28 @@ template <class ELFT> static uint32_t getAndFeatures() {
 }
 
 template <typename ELFT>
-void processGapsEnclave() {
+void processPirateEnclave() {
   for (InputFile *f_ : objectFiles) {
     auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
     if (!f)
       continue;
 
-    for (auto e = f->gaps.enclaves.begin() + 1; e < f->gaps.enclaves.end(); ++e) {
-      StringRef name = f->gaps.getStrtabEntry(e->enc_name);
+    for (const Elf_Pirate_enc<ELFT> &e : f->pirate.enclaves) {
+      if (!e.enc_name) // Initial empty enclave (ENC_UNDEF)
+        continue;
+
+      StringRef name = f->pirate.getStrtabEntry(e.enc_name);
 
       if (name.equals(config->enclave)) {
         enclave = enclave ? enclave : make<Enclave>(config->enclave);
 
-        if (enclave->main && e->enc_main)
+        if (enclave->main && e.enc_main)
           error("Multiple main function specified for enclave " + enclave->name);
         else
-          enclave->main = &f->getSymbol(e->enc_main);
+          enclave->main = &f->getSymbol(e.enc_main);
 
         std::vector<StringRef> caps;
-        f->gaps.getSuppliedCaps(e->enc_cap, caps);
+        f->pirate.getSuppliedCaps(e.enc_cap, caps);
         enclave->capabilities.insert(enclave->capabilities.end(), caps.begin(), caps.end());
       }
     }
@@ -1782,27 +1785,27 @@ void processGapsEnclave() {
 }
 
 template <typename ELFT>
-void processGapsRequirements() {
+void processPirateRequirements() {
   for (InputFile *f_ : objectFiles) {
     auto *f = dyn_cast_or_null<ObjFile<ELFT>>(f_);
     if (!f)
       continue;
 
-    for (auto r = f->gaps.symreqs.begin(); r < f->gaps.symreqs.end(); ++r) {
+    for (auto r = f->pirate.symreqs.begin(); r < f->pirate.symreqs.end(); ++r) {
       std::vector<StringRef> caps;
-      f->gaps.getRequiredCaps(r->req_cap, caps);
+      f->pirate.getRequiredCaps(r->req_cap, caps);
       const char *enclaveName = r->req_enc
-          ? f->gaps.getStrtabEntry(f->gaps.enclaves[r->req_enc].enc_name).data()
+          ? f->pirate.getStrtabEntry(f->pirate.enclaves[r->req_enc].enc_name).data()
           : nullptr;
       Symbol *symbol = &f->getSymbol(r->req_sym);
 
       requirements.emplace_back(caps, enclaveName);
-      symbol->gapsReqsIdx = requirements.size() - 1;
+      symbol->pirateReqsIdx = requirements.size() - 1;
     }
   }
 }
 
-void addGapsMain() {
+void addPirateMain() {
   if (!enclave) {
     error("No enclave named " + config->enclave + " defined");
     return;
@@ -1824,12 +1827,12 @@ void addGapsMain() {
   }
 }
 
-void checkGapsRequirements() {
+void checkPirateRequirements() {
   for (InputFile *f : objectFiles) {
     for (Symbol *s : f->getSymbols()) {
-      if (s->gapsReqsIdx < 0)
+      if (s->pirateReqsIdx < 0)
         continue;
-      Requirements &r = requirements[s->gapsReqsIdx];
+      Requirements &r = requirements[s->pirateReqsIdx];
 
       auto *d = dyn_cast_or_null<Defined>(s);
       if (!d || !d->section->isLive())
@@ -2030,11 +2033,11 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
       return true;
     }
 
-    // Handle GAPS sections
-    if (s->name.startswith(".gaps.res"))
-      return readGapsResSection<ELFT>(s);
-    else if (!config->enclave.empty() && s->name.startswith(".gaps"))
-      return readGapsSection<ELFT>(s);
+    // Handle Pirate sections
+    if (s->name.startswith(".pirate.res"))
+      return readPirateResSection<ELFT>(s);
+    else if (!config->enclave.empty() && s->name.startswith(".pirate"))
+      return readPirateSection<ELFT>(s);
 
     // We do not want to emit debug sections if --strip-all
     // or -strip-debug are given.
@@ -2043,9 +2046,9 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   });
 
   if (!config->enclave.empty()) {
-    processGapsEnclave<ELFT>();
-    processGapsRequirements<ELFT>();
-    addGapsMain();
+    processPirateEnclave<ELFT>();
+    processPirateRequirements<ELFT>();
+    addPirateMain();
   }
 
   // Now that the number of partitions is fixed, save a pointer to the main
@@ -2098,7 +2101,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   // Garbage collection and removal of shared symbols from unused shared objects.
   markLive<ELFT>();
   demoteSharedSymbols();
-  checkGapsRequirements();
+  checkPirateRequirements();
 
   // Make copies of any input sections that need to be copied into each
   // partition.

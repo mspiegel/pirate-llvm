@@ -1170,7 +1170,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
   MCSectionELF *CapabilitiesSection = nullptr;
   if (!Asm.PartitionCapabilities.empty()) {
-    CapabilitiesSection = Ctx.getELFSection(".gaps.capabilities",
+    CapabilitiesSection = Ctx.getELFSection(".pirate.capabilities",
                                          ELF::SHT_PROGBITS,
                                          0, 16, "");
     CapabilitiesSection->setAlignment(Align(8));
@@ -1186,7 +1186,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
   MCSectionELF *EnclavesSection = nullptr;
   if (!Asm.PartitionEnclaves.empty()) {
-    EnclavesSection = Ctx.getELFSection(".gaps.enclaves",
+    EnclavesSection = Ctx.getELFSection(".pirate.enclaves",
                                          ELF::SHT_PROGBITS,
                                          0, 16, ""); // XXX: Fix length
     EnclavesSection->setAlignment(Align(8));
@@ -1205,7 +1205,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
   MCSectionELF *RequirementsSection = nullptr;
   if (!Asm.PartitionRequirements.empty()) {
-    RequirementsSection = Ctx.getELFSection(".gaps.symreqs",
+    RequirementsSection = Ctx.getELFSection(".pirate.symreqs",
                                          ELF::SHT_PROGBITS,
                                          0, 12, "");
     RequirementsSection->setAlignment(Align(4));
@@ -1214,7 +1214,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
   MCSectionELF *CapsTabSection = nullptr;
   if (!Asm.PartitionRequirements.empty() || !Asm.PartitionEnclaves.empty()) {
-    CapsTabSection = Ctx.getELFSection(".gaps.captab",
+    CapsTabSection = Ctx.getELFSection(".pirate.captab",
                                          ELF::SHT_PROGBITS,
                                          0, 4, "");
     CapsTabSection->setAlignment(Align(4));                             
@@ -1225,7 +1225,7 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
   MCSectionELF *CapStrTabSection = nullptr;
   // The first entry is always populated for the empty string
   if (capstrtab.getSize() > 1) {
-    CapStrTabSection = Ctx.getELFSection(".gaps.strtab", ELF::SHT_PROGBITS, 0, 1, "");
+    CapStrTabSection = Ctx.getELFSection(".pirate.strtab", ELF::SHT_PROGBITS, 0, 1, "");
     SectionIndexMap[CapStrTabSection] = addToSectionTable(CapStrTabSection);
   }
 
