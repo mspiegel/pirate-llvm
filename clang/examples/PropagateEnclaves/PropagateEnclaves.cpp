@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/Attr.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTConsumer.h"
@@ -22,6 +23,16 @@
 #include <unordered_map>
 
 using namespace clang;
+
+#if 0
+namespace std {
+  template<> struct hash<StringRef> {
+    size_t operator()(StringRef const& s) const noexcept {
+      return hash<string>{}(s.str());
+    }
+  };
+}
+#endif
 
 namespace {
 
@@ -100,6 +111,51 @@ public:
     auto components = g.scc_enumeration();
     auto scc_gr = scc_graph(g, components);
 
+    std::unordered_map<unsigned long, std::unordered_set<std::string>> decl_caps;
+
+    // Determine capabilities used by each component
+    for (size_t i = 0; i < components.size(); i++) {
+      for (auto p : components[i]) {
+        if (auto *funDecl = dyn_cast<FunctionDecl>(p)) {
+          for (auto const& attr : funDecl->specific_attrs<PirateCapabilityAttr>()) {
+            decl_caps[i].insert(attr->getCapability());
+          }
+        }
+      }
+    }
+
+    // Inherit capability requirements from all parents
+    for (auto subtree : scc_gr.dfs_enumeration()) {
+      for (auto i : subtree) {
+        for (auto e : scc_gr.edges[i]) {
+          auto const& caps = decl_caps[e];
+          decl_caps[i].insert(caps.begin(), caps.end());
+        }
+      }
+    }
+
+    // Distribute capabilities back to component members
+    for (size_t i = 0; i < components.size(); i++) {
+      for (auto p : components[i]) {
+        if (auto *funDecl = dyn_cast<FunctionDecl>(p)) {
+          funDecl = funDecl->getDefinition();
+          auto caps_needed = decl_caps[i];
+          
+          // remove attributes that are already explicitly added
+          for (auto const& attr : funDecl->specific_attrs<PirateCapabilityAttr>()) {
+            caps_needed.erase(attr->getCapability());
+          }
+
+          // add implicit capability requirements
+          for (auto const& cap : caps_needed) {
+            auto a = PirateCapabilityAttr::Create(Context, cap, AttributeCommonInfo(SourceRange()));
+            funDecl->addAttr(a);
+          }
+        }
+      }
+    }
+
+#ifdef DEBUG
     for (size_t i = 0; i < components.size(); i++) {
       llvm::errs() << "Component " << i << "\n";
 
@@ -114,9 +170,14 @@ public:
       for (auto const& x : scc_gr.edges[i]) {
         llvm::errs() << " " << x;
       }
+      llvm::errs() << "\n  caps:";
+      for (auto const& cap : decl_caps[i]) {
+        llvm::errs() << " " << cap;
+      }
       llvm::errs() << "\n";
     }
   }
+#endif
 };
 
 class PropagateAnnotationsAction : public PluginASTAction {

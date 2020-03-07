@@ -3988,7 +3988,7 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
       auto cap = attr->getCapability();
       caps.insert(caps.end(), cap.begin(), cap.end());
     }
-    GV->addAttribute("pirate_capability", caps);
+    GV->addAttribute("pirate_capabilities", caps);
   }
 
   if (D->hasAttr<PirateEnclaveOnlyAttr>()) {
