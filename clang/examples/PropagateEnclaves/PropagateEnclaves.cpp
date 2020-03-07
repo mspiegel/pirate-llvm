@@ -176,8 +176,8 @@ public:
       }
       llvm::errs() << "\n";
     }
-  }
 #endif
+  }
 };
 
 class PropagateAnnotationsAction : public PluginASTAction {
