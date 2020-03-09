@@ -40,16 +40,10 @@ class PropagateAnnotations
  : public RecursiveASTVisitor<PropagateAnnotations> {
 
 private:
-  ASTContext& Context;
   std::unordered_set<Decl*> currentSet;
 
 public:
   std::unordered_map<Decl*, std::unordered_set<Decl*>> declRefs;
-
-  PropagateAnnotations(ASTContext &Context)
-    : Context(Context)
-    , currentSet()
-    , declRefs() {}
 
   // We visit imlicit constructors because they might call
   // restricted constructors.
@@ -78,30 +72,8 @@ public:
 class PropagateAnnotationsConsumer : public ASTConsumer {
 public:
   void HandleTranslationUnit(ASTContext &Context) override {
-    PropagateAnnotations Visitor(Context);
+    PropagateAnnotations Visitor;
     Visitor.TraverseDecl(Context.getTranslationUnitDecl());
-
-    for (auto elt : Visitor.declRefs) {
-      auto decl = elt.first;
-      auto links = elt.second;
-      if (auto *funDecl = llvm::dyn_cast<FunctionDecl>(decl)) {
-        llvm::errs() << " " << funDecl << ":" << funDecl->getName();
-      } else {
-        llvm::errs() << " " << decl;
-      }
-      llvm::errs() << "\n  ";
-      for (auto decl : links) {
-        if (auto *funDecl = llvm::dyn_cast<FunctionDecl>(decl)) {
-          llvm::errs() << " " << funDecl << ":" << funDecl->getName();
-        } else {
-          llvm::errs() << " " << decl;
-        }
-      }
-      llvm::errs() << "\n";
-    }
-
-      llvm::errs() << "\n\n\n";
-
 
     Gr<Decl*> g;
     for (auto const& x : Visitor.declRefs) {
@@ -112,24 +84,32 @@ public:
     auto scc_gr = scc_graph(g, components);
 
     std::unordered_map<unsigned long, std::unordered_set<std::string>> decl_caps;
+    std::unordered_map<unsigned long, std::unordered_set<std::string>> decl_enclaves;
 
-    // Determine capabilities used by each component
+    // Determine pirate_capability and pirate_enclave_only used by each component
     for (size_t i = 0; i < components.size(); i++) {
-      for (auto p : components[i]) {
-        if (auto *funDecl = dyn_cast<FunctionDecl>(p)) {
-          for (auto const& attr : funDecl->specific_attrs<PirateCapabilityAttr>()) {
+      for (auto const p : components[i]) {
+        if (auto *const funDecl = dyn_cast<FunctionDecl>(p)) {
+          for (auto const attr : funDecl->specific_attrs<PirateCapabilityAttr>()) {
             decl_caps[i].insert(attr->getCapability());
+          }
+          for (auto const attr : funDecl->specific_attrs<PirateEnclaveOnlyAttr>()) {
+            decl_enclaves[i].insert(attr->getEnclaveName());
           }
         }
       }
     }
 
-    // Inherit capability requirements from all parents
+    // Inherit requirements from all parents
     for (auto subtree : scc_gr.dfs_enumeration()) {
       for (auto i : subtree) {
         for (auto e : scc_gr.edges[i]) {
+          // inherit capabilities
           auto const& caps = decl_caps[e];
           decl_caps[i].insert(caps.begin(), caps.end());
+          // inherit enclave restrictions
+          auto const& encs = decl_enclaves[e];
+          decl_enclaves[i].insert(encs.begin(), encs.end());
         }
       }
     }
@@ -138,45 +118,44 @@ public:
     for (size_t i = 0; i < components.size(); i++) {
       for (auto p : components[i]) {
         if (auto *funDecl = dyn_cast<FunctionDecl>(p)) {
+          // The attributes need to be on the definition to be visible
           funDecl = funDecl->getDefinition();
-          auto caps_needed = decl_caps[i];
-          
-          // remove attributes that are already explicitly added
-          for (auto const& attr : funDecl->specific_attrs<PirateCapabilityAttr>()) {
-            caps_needed.erase(attr->getCapability());
+          {
+            auto caps_needed = decl_caps[i];
+
+            // remove attributes that are already explicitly added
+            for (auto const &attr :
+                 funDecl->specific_attrs<PirateCapabilityAttr>()) {
+              caps_needed.erase(attr->getCapability());
+            }
+
+            // add implicit capability requirements
+            for (auto const &cap : caps_needed) {
+              auto a = PirateCapabilityAttr::Create(
+                  Context, cap, AttributeCommonInfo(SourceRange()));
+              funDecl->addAttr(a);
+            }
           }
 
-          // add implicit capability requirements
-          for (auto const& cap : caps_needed) {
-            auto a = PirateCapabilityAttr::Create(Context, cap, AttributeCommonInfo(SourceRange()));
-            funDecl->addAttr(a);
+          {
+            auto enclaves_needed = decl_enclaves[i];
+
+            // remove attributes that are already explicitly added
+            for (auto const &attr :
+                 funDecl->specific_attrs<PirateEnclaveOnlyAttr>()) {
+              enclaves_needed.erase(attr->getEnclaveName());
+            }
+
+            // add implicit capability requirements
+            for (auto const &enc : enclaves_needed) {
+              auto a = PirateEnclaveOnlyAttr::Create(
+                  Context, enc, AttributeCommonInfo(SourceRange()));
+              funDecl->addAttr(a);
+            }
           }
         }
       }
     }
-
-#ifdef DEBUG
-    for (size_t i = 0; i < components.size(); i++) {
-      llvm::errs() << "Component " << i << "\n";
-
-      for (auto elt : components[i]) {
-        if (auto *funDecl = llvm::dyn_cast<FunctionDecl>(elt)) {
-          llvm::errs() << " " << funDecl << ":" << funDecl->getName();
-        } else {
-          llvm::errs() << " " << elt;
-        }
-      }
-      llvm::errs() << "\n  ->";
-      for (auto const& x : scc_gr.edges[i]) {
-        llvm::errs() << " " << x;
-      }
-      llvm::errs() << "\n  caps:";
-      for (auto const& cap : decl_caps[i]) {
-        llvm::errs() << " " << cap;
-      }
-      llvm::errs() << "\n";
-    }
-#endif
   }
 };
 
@@ -227,8 +206,3 @@ public:
 
 static FrontendPluginRegistry::Add<PropagateAnnotationsAction>
 X("propagate-enclaves", "propagate enclave annotations");
-
-/*
-static PragmaHandlerRegistry::Add<PragmaAnnotateHandler>
-Y("enable_annotate","enable annotation");
-*/
