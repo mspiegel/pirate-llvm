@@ -63,9 +63,15 @@ public:
     return result;
   }
 
+  bool VisitCXXMethodDecl(CXXMethodDecl *D) {
+    llvm::errs() << "Visiting " << D->getNameAsString() <<"\n";
+    currentSet.insert(D->getParent()->getCanonicalDecl());
+    return true; // continue
+  }
+
   bool VisitDeclRefExpr(DeclRefExpr* D) {
     currentSet.insert(D->getDecl()->getCanonicalDecl());
-    return true;
+    return true; // continue
   }
 };
 
@@ -89,13 +95,11 @@ public:
     // Determine pirate_capability and pirate_enclave_only used by each component
     for (size_t i = 0; i < components.size(); i++) {
       for (auto const p : components[i]) {
-        if (auto *const funDecl = dyn_cast<FunctionDecl>(p)) {
-          for (auto const attr : funDecl->specific_attrs<PirateCapabilityAttr>()) {
-            decl_caps[i].insert(attr->getCapability());
-          }
-          for (auto const attr : funDecl->specific_attrs<PirateEnclaveOnlyAttr>()) {
-            decl_enclaves[i].insert(attr->getEnclaveName());
-          }
+        for (auto const attr : p->specific_attrs<PirateCapabilityAttr>()) {
+          decl_caps[i].insert(attr->getCapability());
+        }
+        for (auto const attr : p->specific_attrs<PirateEnclaveOnlyAttr>()) {
+          decl_enclaves[i].insert(attr->getEnclaveName());
         }
       }
     }
