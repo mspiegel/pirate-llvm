@@ -3431,7 +3431,7 @@ def NoBuiltin : Attr {
 
 def PirateEnclaveOnly : InheritableAttr {
   let Spellings = [Clang<"pirate_enclave_only">];
-  let Subjects = SubjectList<[Function, GlobalVar]>;
+  let Subjects = SubjectList<[Struct, Function, GlobalVar]>;
   let Documentation = [PirateEnclaveOnlyDocs];
   let Args = [StringArgument<"EnclaveName">];
 }
@@ -3445,7 +3445,7 @@ def PirateEnclaveMain : InheritableAttr {
 
 def PirateCapability : InheritableAttr {
   let Spellings = [Clang<"pirate_capability">];
-  let Subjects = SubjectList<[Function, GlobalVar]>;
+  let Subjects = SubjectList<[Struct, Function, GlobalVar]>;
   let Documentation = [PirateCapabilityDocs];
   let Args = [StringArgument<"Capability">];
 }
