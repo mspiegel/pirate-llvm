@@ -3981,6 +3981,24 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
 
   MaybeHandleStaticInExternC(D, GV);
 
+  if (auto *attr = D->getAttr<PirateResourceAttr>()) {
+    GV->addAttribute("pirate_resource_name", attr->getResName());
+    GV->addAttribute("pirate_resource_type", attr->getResType());
+  }
+    
+  if (D->hasAttr<PirateResourceParamAttr>()) {
+    std::string caps;
+    for (auto const& attr : D->specific_attrs<PirateResourceParamAttr>()) {
+      if (!caps.empty()) { caps += ","; }
+      auto const key = attr->getKey();
+      caps.insert(caps.end(), key.begin(), key.end());
+      caps += "=";
+      auto const val = attr->getValue();
+      caps.insert(caps.end(), val.begin(), val.end());
+    }
+    GV->addAttribute("pirate_resource_parameters", caps);
+  }
+
   if (D->hasAttr<PirateCapabilityAttr>()) {
     std::string caps;
     for (auto const& attr : D->specific_attrs<PirateCapabilityAttr>()) {

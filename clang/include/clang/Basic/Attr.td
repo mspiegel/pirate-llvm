@@ -3449,3 +3449,17 @@ def PirateCapability : InheritableAttr {
   let Documentation = [PirateCapabilityDocs];
   let Args = [StringArgument<"Capability">];
 }
+
+def PirateResource : InheritableAttr {
+  let Spellings = [Clang<"pirate_resource">];
+  let Subjects = SubjectList<[GlobalVar]>;
+  let Documentation = [PirateResourceDocs];
+  let Args = [StringArgument<"ResName">, StringArgument<"ResType">];
+}
+
+def PirateResourceParam : InheritableAttr {
+  let Spellings = [Clang<"pirate_resource_param">];
+  let Subjects = SubjectList<[GlobalVar]>;
+  let Documentation = [PirateResourceParamDocs];
+  let Args = [StringArgument<"Key">, StringArgument<"Value">];
+}

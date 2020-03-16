@@ -64,7 +64,6 @@ public:
   }
 
   bool VisitCXXMethodDecl(CXXMethodDecl *D) {
-    llvm::errs() << "Visiting " << D->getNameAsString() <<"\n";
     currentSet.insert(D->getParent()->getCanonicalDecl());
     return true; // continue
   }
@@ -206,7 +205,7 @@ public:
 };
 */
 
-}
-
-static FrontendPluginRegistry::Add<PropagateAnnotationsAction>
+FrontendPluginRegistry::Add<PropagateAnnotationsAction>
 X("propagate-enclaves", "propagate enclave annotations");
+
+}

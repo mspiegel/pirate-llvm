@@ -4476,3 +4476,19 @@ def PirateCapabilityDocs : Documentation {
   Mark a declaration that requires an enclave with a particular capability.
   }];
 }
+
+def PirateResourceDocs : Documentation {
+  let Category = DocCatFunction;
+  let Heading = "pirate_resource";
+  let Content = [{
+  Annotate a resource with a name and resource type.
+  }];
+}
+
+def PirateResourceParamDocs : Documentation {
+  let Category = DocCatFunction;
+  let Heading = "pirate_resource_param";
+  let Content = [{
+  Annotate a resource with a key-value parameter.
+  }];
+}
