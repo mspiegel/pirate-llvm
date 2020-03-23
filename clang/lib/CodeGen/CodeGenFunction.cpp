@@ -1223,13 +1223,11 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
   }
 
   if (FD->hasAttr<PirateCapabilityAttr>()) {
-    std::string caps;
+    std::vector<llvm::Metadata *> mds;
     for (auto const& attr : FD->specific_attrs<PirateCapabilityAttr>()) {
-      if (!caps.empty()) { caps += ","; }
-      auto cap = attr->getCapability();
-      caps.insert(caps.end(), cap.begin(), cap.end());
+      mds.push_back(llvm::MDString::get(getLLVMContext(), attr->getCapability()));
     }
-    Fn->addFnAttr("pirate_capabilities", caps);
+    Fn->addMetadata("pirate_capabilities", *llvm::MDNode::get(getLLVMContext(), mds));
   }
 
 

@@ -3987,26 +3987,31 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
   }
     
   if (D->hasAttr<PirateResourceParamAttr>()) {
+    std::vector<llvm::Metadata *> mds;
+
     std::string caps;
     for (auto const& attr : D->specific_attrs<PirateResourceParamAttr>()) {
-      if (!caps.empty()) { caps += ","; }
-      auto const key = attr->getKey();
-      caps.insert(caps.end(), key.begin(), key.end());
-      caps += "=";
-      auto const val = attr->getValue();
-      caps.insert(caps.end(), val.begin(), val.end());
+      llvm::Metadata *kv[] = {
+        llvm::MDString::get(getLLVMContext(), attr->getKey()),
+        llvm::MDString::get(getLLVMContext(), attr->getValue()),
+      };
+      mds.push_back(llvm::MDNode::get(getLLVMContext(), kv));
     }
-    GV->addAttribute("pirate_resource_parameters", caps);
+
+    StringRef md_key = "pirate_resource_parameters";
+    auto node = llvm::MDNode::get(getLLVMContext(), mds);
+
+    GV->addMetadata(md_key, *node);
   }
 
   if (D->hasAttr<PirateCapabilityAttr>()) {
-    std::string caps;
+    std::vector<llvm::Metadata *> mds;
+
     for (auto const& attr : D->specific_attrs<PirateCapabilityAttr>()) {
-      if (!caps.empty()) { caps += ","; }
-      auto cap = attr->getCapability();
-      caps.insert(caps.end(), cap.begin(), cap.end());
+      mds.push_back(llvm::MDString::get(getLLVMContext(), attr->getCapability()));
     }
-    GV->addAttribute("pirate_capabilities", caps);
+
+    GV->addMetadata("pirate_capabilities", *llvm::MDNode::get(getLLVMContext(), mds));
   }
 
   if (D->hasAttr<PirateEnclaveOnlyAttr>()) {

@@ -1398,6 +1398,10 @@ void AsmPrinter::emitPirateSections(Module &M) {
     std::pair<StringRef,
               std::vector<StringRef>>> requirements;
 
+  std::unordered_map<MCSymbol*,
+    std::tuple<StringRef, StringRef, std::unordered_map<std::string, std::string>>
+  > resources;
+
   if (auto* enclavesMD = M.getNamedMetadata("pirate.enclaves")) {
     for (llvm::MDNode* e : enclavesMD->operands()) {
       auto name = cast<MDString>(e->getOperand(0).get())->getString();
@@ -1440,16 +1444,12 @@ void AsmPrinter::emitPirateSections(Module &M) {
       requirements[getSymbol(&f)].first = enclave;
     }
 
-    if (f.hasFnAttribute("pirate_capabilities")) {
-      auto capability = f.getFnAttribute("pirate_capabilities").getValueAsString();
-
-      auto start = capability.begin();
-      decltype(start) end;
-      do {
-        end = std::find(start, capability.end(), ',');
-        requirements[getSymbol(&f)].second.push_back(*(new std::string(start, end)));
-        start = end + 1;
-      } while (end != capability.end());
+    if (auto *caps = f.getMetadata("pirate_capabilities")) {
+      for (auto const& cap : caps->operands()) {
+        if (auto const* str = llvm::dyn_cast<MDString>(cap)) {
+          requirements[getSymbol(&f)].second.push_back(str->getString());
+        }
+      }
     }
   }
 
@@ -1462,6 +1462,29 @@ void AsmPrinter::emitPirateSections(Module &M) {
     if (d.hasAttribute("pirate_capabilities")) {
       auto capability = d.getAttribute("pirate_capabilities").getValueAsString();
       requirements[getSymbol(&d)].second.push_back(capability);
+    }
+
+    if (d.hasAttribute("pirate_resource_name") && d.hasAttribute("pirate_resource_type")) {
+
+      auto resName = d.getAttribute("pirate_resource_name").getValueAsString();
+      auto resType = d.getAttribute("pirate_resource_type").getValueAsString();
+      std::unordered_map<std::string, std::string> params;
+
+      if (auto *params_md = d.getMetadata("pirate_resource_params")) {
+        for (auto const& kv : params_md->operands()) {
+          if (auto* node = llvm::dyn_cast<llvm::MDNode>(kv)) {
+            if (2 == node->getNumOperands()) {
+              if (auto const* k = llvm::dyn_cast<MDString>(node->getOperand(0))) {
+                if (auto const* v = llvm::dyn_cast<MDString>(node->getOperand(1))) {
+                  
+                }
+              }
+            }
+          }
+        }
+      }
+
+      resources[getSymbol(&d)] = std::make_tuple(resName, resType, std::move(params));
     }
   }
 
