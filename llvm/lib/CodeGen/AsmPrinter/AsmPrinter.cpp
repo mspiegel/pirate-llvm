@@ -1399,7 +1399,7 @@ void AsmPrinter::emitPirateSections(Module &M) {
               std::vector<StringRef>>> requirements;
 
   std::unordered_map<MCSymbol*,
-    std::tuple<StringRef, StringRef, std::unordered_map<std::string, std::string>>
+    std::tuple<StringRef, StringRef, std::unordered_map<std::string, StringRef>>
   > resources;
 
   if (auto* enclavesMD = M.getNamedMetadata("pirate.enclaves")) {
@@ -1412,14 +1412,14 @@ void AsmPrinter::emitPirateSections(Module &M) {
 
   if (auto* capabilitiesMD = M.getNamedMetadata("pirate.capabilities")) {
     for (llvm::MDNode* e : capabilitiesMD->operands()) {
-      auto name = cast<MDString>(e->getOperand(0).get())->getString();
-
-      if (e->getNumOperands() == 2) {
-        auto parent = cast<MDString>(e->getOperand(1).get())->getString();
-
-        capabilities[name.str()] = std::make_pair(name, parent);
-      } else {
-        capabilities[name.str()] = std::make_pair(name, "");
+      if (auto *name = dyn_cast<MDString>(e->getOperand(0).get())) {
+        if (e->getNumOperands() == 2) {
+          if (auto *parent = dyn_cast<MDString>(e->getOperand(1).get())) {
+            capabilities[name->getString()] = std::make_pair(name->getString(), parent->getString());
+          }
+        } else {
+          capabilities[name->getString()] = std::make_pair(name->getString(), "");
+        }
       }
     }
   }
@@ -1435,7 +1435,7 @@ void AsmPrinter::emitPirateSections(Module &M) {
 
   for (auto const& f : M.functions()) {
     if (f.hasFnAttribute("pirate_enclave_main")) {
-      auto enclave = f.getFnAttribute("pirate_enclave_main").getValueAsString().str();
+      auto enclave = f.getFnAttribute("pirate_enclave_main").getValueAsString();
       std::get<1>(enclaves[enclave]) = getSymbol(&f);
     }
 
@@ -1468,15 +1468,15 @@ void AsmPrinter::emitPirateSections(Module &M) {
 
       auto resName = d.getAttribute("pirate_resource_name").getValueAsString();
       auto resType = d.getAttribute("pirate_resource_type").getValueAsString();
-      std::unordered_map<std::string, std::string> params;
+      std::unordered_map<std::string, StringRef> params;
 
       if (auto *params_md = d.getMetadata("pirate_resource_params")) {
         for (auto const& kv : params_md->operands()) {
-          if (auto* node = llvm::dyn_cast<llvm::MDNode>(kv)) {
+          if (auto* node = dyn_cast<MDNode>(kv)) {
             if (2 == node->getNumOperands()) {
-              if (auto const* k = llvm::dyn_cast<MDString>(node->getOperand(0))) {
-                if (auto const* v = llvm::dyn_cast<MDString>(node->getOperand(1))) {
-                  
+              if (auto const* k = dyn_cast<MDString>(node->getOperand(0))) {
+                if (auto const* v = dyn_cast<MDString>(node->getOperand(1))) {
+                  params[k->getString()] = v->getString();
                 }
               }
             }
