@@ -3419,6 +3419,41 @@ void PragmaPirateHandler::HandlePragma(Preprocessor &PP,
       PP.Diag(PragmaLoc, diag::warn_pragma_capability);
       return;
     }
+  } else if (command == "resource_type") {
+    
+    // Get resource_type command: declare
+    PP.Lex(Tok);
+    if (Tok.isAnyIdentifier()) {
+      command = Tok.getIdentifierInfo()->getName();
+    } else {
+      PP.Diag(Tok, diag::warn_pragma_capability);
+      return;
+    }
+    
+    if (command == "declare") {
+      PP.Lex(Tok);
+      if (Tok.isNot(tok::l_paren)) {
+        PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
+        return;
+      }
+      
+      
+
+      PP.Lex(Tok);
+      if (Tok.isNot(tok::r_paren)) {
+        PP.Diag(PragmaLoc, diag::warn_pragma_enclave);
+        return;
+      }
+
+      PP.Lex(Tok);
+      if (Tok.isNot(tok::eod)) {
+        PP.Diag(PragmaLoc, diag::warn_pragma_extra_tokens_at_eol) << "enclave";
+        return;
+      }
+    } else {
+      PP.Diag(PragmaLoc, diag::warn_pragma_capability); // XXX
+      return;
+    }
   } else {
     PP.Diag(Tok, diag::warn_pragma_enclave); // XXX
     return;

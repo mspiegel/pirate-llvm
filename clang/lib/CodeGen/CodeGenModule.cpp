@@ -3858,6 +3858,72 @@ void CodeGenModule::maybeSetTrivialComdat(const Decl &D,
   GO.setComdat(TheModule.getOrInsertComdat(GO.getName()));
 }
 
+static
+void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVariable *GV) {
+
+  auto & A = CG->getContext();
+  auto & C = CG->getLLVMContext();
+  using namespace llvm;
+  
+  if (auto *resattr = D->getAttr<PirateResourceAttr>()) {
+    GV->addAttribute("pirate_resource_name", resattr->getResName());
+    GV->addAttribute("pirate_resource_type", resattr->getResType());
+  
+    
+    if (D->hasAttr<PirateResourceParamAttr>()) {
+      std::vector<llvm::Metadata *> mds;
+      std::vector<llvm::Constant *> entriesElts;
+      auto zero = llvm::ConstantInt::get(C, APInt(64, "0", 10));
+
+      auto entryType = StructType::get(C,
+        {llvm::PointerType::getInt8PtrTy(C),
+        llvm::PointerType::getInt8PtrTy(C),
+        }
+      );
+
+      for (auto const& attr : D->specific_attrs<PirateResourceParamAttr>()) {
+        llvm::Metadata *kv[] = {
+          llvm::MDString::get(C, attr->getKey()),
+          llvm::MDString::get(C, attr->getValue()),
+        };
+        mds.push_back(llvm::MDNode::get(CG->getLLVMContext(), kv));
+
+        auto k = CG->GetAddrOfConstantCString(attr->getKey());
+        auto v = CG->GetAddrOfConstantCString(attr->getValue());
+        auto kp = llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, k.getPointer(), ArrayRef<Constant *>{zero,zero});
+        auto vp = llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, k.getPointer(), ArrayRef<Constant *>{zero,zero});
+        auto entry = ConstantStruct::get(entryType, {kp, vp});
+        entriesElts.push_back(entry);
+      }
+
+      auto entriesType = llvm::ArrayType::get(entryType, entriesElts.size());
+      auto entries = ConstantArray::get(entriesType, entriesElts);
+
+      auto u = CG->createUnnamedGlobalFrom(*D, entries, clang::CharUnits::One()*16);
+        // XXX: figure out how to compute alignment correctly
+
+      llvm::GlobalVariable *v = cast<llvm::GlobalVariable>(u.getPointer());
+      v->addAttribute("pirate_resource_parameters", resattr->getResName());
+    }
+  }
+
+  if (D->hasAttr<PirateCapabilityAttr>()) {
+    std::vector<llvm::Metadata *> mds;
+
+    for (auto const& attr : D->specific_attrs<PirateCapabilityAttr>()) {
+      mds.push_back(llvm::MDString::get(C, attr->getCapability()));
+    }
+
+    GV->addMetadata("pirate_capabilities", *llvm::MDNode::get(C, mds));
+  }
+
+  if (D->hasAttr<PirateEnclaveOnlyAttr>()) {
+    GV->addAttribute(
+      "pirate_enclave_only",
+      D->getAttr<PirateEnclaveOnlyAttr>()->getEnclaveName());
+  }
+}
+
 /// Pass IsTentative as true if you want to create a tentative definition.
 void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
                                             bool IsTentative) {
@@ -3981,44 +4047,8 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
 
   MaybeHandleStaticInExternC(D, GV);
 
-  if (auto *attr = D->getAttr<PirateResourceAttr>()) {
-    GV->addAttribute("pirate_resource_name", attr->getResName());
-    GV->addAttribute("pirate_resource_type", attr->getResType());
-  }
-    
-  if (D->hasAttr<PirateResourceParamAttr>()) {
-    std::vector<llvm::Metadata *> mds;
-
-    std::string caps;
-    for (auto const& attr : D->specific_attrs<PirateResourceParamAttr>()) {
-      llvm::Metadata *kv[] = {
-        llvm::MDString::get(getLLVMContext(), attr->getKey()),
-        llvm::MDString::get(getLLVMContext(), attr->getValue()),
-      };
-      mds.push_back(llvm::MDNode::get(getLLVMContext(), kv));
-    }
-
-    StringRef md_key = "pirate_resource_parameters";
-    auto node = llvm::MDNode::get(getLLVMContext(), mds);
-
-    GV->addMetadata(md_key, *node);
-  }
-
-  if (D->hasAttr<PirateCapabilityAttr>()) {
-    std::vector<llvm::Metadata *> mds;
-
-    for (auto const& attr : D->specific_attrs<PirateCapabilityAttr>()) {
-      mds.push_back(llvm::MDString::get(getLLVMContext(), attr->getCapability()));
-    }
-
-    GV->addMetadata("pirate_capabilities", *llvm::MDNode::get(getLLVMContext(), mds));
-  }
-
-  if (D->hasAttr<PirateEnclaveOnlyAttr>()) {
-    GV->addAttribute(
-      "pirate_enclave_only",
-      D->getAttr<PirateEnclaveOnlyAttr>()->getEnclaveName());
-  }
+  EmitPirateMetadataGV(this, D, GV);
+  
 
   if (D->hasAttr<AnnotateAttr>())
     AddGlobalAnnotations(D, GV);
