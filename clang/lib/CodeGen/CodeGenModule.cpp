@@ -3859,42 +3859,54 @@ void CodeGenModule::maybeSetTrivialComdat(const Decl &D,
 }
 
 static
+llvm::Constant *
+mkString(CodeGenModule *CG, StringRef str) {
+  auto zero = llvm::ConstantInt::get(CG->getLLVMContext(), llvm::APInt(64, "0", 10));
+  auto addr = CG->GetAddrOfConstantCString(str);
+  auto ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, addr.getPointer(), ArrayRef<llvm::Constant *>{zero,zero});
+  return ptr;
+}
+
+static
 void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVariable *GV) {
 
-  auto & A = CG->getContext();
   auto & C = CG->getLLVMContext();
   using namespace llvm;
   
-  if (auto *resattr = D->getAttr<PirateResourceAttr>()) {
-    GV->addAttribute("pirate_resource_name", resattr->getResName());
-    GV->addAttribute("pirate_resource_type", resattr->getResType());
-  
-    
-    if (D->hasAttr<PirateResourceParamAttr>()) {
-      std::vector<llvm::Metadata *> mds;
-      std::vector<llvm::Constant *> entriesElts;
-      auto zero = llvm::ConstantInt::get(C, APInt(64, "0", 10));
+  if (auto *resattr = D->getAttr<PirateResourceAttr>()) {   
 
-      auto entryType = StructType::get(C,
-        {llvm::PointerType::getInt8PtrTy(C),
-        llvm::PointerType::getInt8PtrTy(C),
-        }
-      );
+    auto entryType = StructType::get(C,
+      {llvm::PointerType::getInt8PtrTy(C),
+      llvm::PointerType::getInt8PtrTy(C),
+      }
+    );
+
+    auto paddingType = llvm::ArrayType::get(llvm::Type::getInt8Ty(C), 8);
+
+    auto resourceType = llvm::StructType::get(C, ArrayRef<llvm::Type*>{
+      llvm::PointerType::getInt8PtrTy(C),
+      llvm::PointerType::getInt8PtrTy(C),
+      llvm::PointerType::get(entryType, 0),
+      paddingType,
+    }, /*packed*/true);
+
+    auto pr_name = mkString(CG, resattr->getResName());
+    auto pr_type = mkString(CG, resattr->getResType());
+    auto pr_params = llvm::ConstantExpr::getNullValue(llvm::PointerType::get(entryType, 0));
+    auto pr_obj = GV;
+
+    if (D->hasAttr<PirateResourceParamAttr>()) {
+      std::vector<llvm::Constant *> entriesElts;    
 
       for (auto const& attr : D->specific_attrs<PirateResourceParamAttr>()) {
-        llvm::Metadata *kv[] = {
-          llvm::MDString::get(C, attr->getKey()),
-          llvm::MDString::get(C, attr->getValue()),
-        };
-        mds.push_back(llvm::MDNode::get(CG->getLLVMContext(), kv));
 
-        auto k = CG->GetAddrOfConstantCString(attr->getKey());
-        auto v = CG->GetAddrOfConstantCString(attr->getValue());
-        auto kp = llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, k.getPointer(), ArrayRef<Constant *>{zero,zero});
-        auto vp = llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, k.getPointer(), ArrayRef<Constant *>{zero,zero});
+        auto kp = mkString(CG, attr->getKey());
+        auto vp = mkString(CG, attr->getValue());
         auto entry = ConstantStruct::get(entryType, {kp, vp});
         entriesElts.push_back(entry);
       }
+
+      entriesElts.push_back(llvm::ConstantAggregateZero::get(entryType));
 
       auto entriesType = llvm::ArrayType::get(entryType, entriesElts.size());
       auto entries = ConstantArray::get(entriesType, entriesElts);
@@ -3902,9 +3914,22 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
       auto u = CG->createUnnamedGlobalFrom(*D, entries, clang::CharUnits::One()*16);
         // XXX: figure out how to compute alignment correctly
 
-      llvm::GlobalVariable *v = cast<llvm::GlobalVariable>(u.getPointer());
-      v->addAttribute("pirate_resource_parameters", resattr->getResName());
+      auto v = cast<llvm::Constant>(u.getPointer());
+      
+      auto zero = llvm::ConstantInt::get(CG->getLLVMContext(), llvm::APInt(64, "0", 10));
+      pr_params = llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, v, ArrayRef<llvm::Constant*>{zero, zero});
     }
+
+
+    auto resource = llvm::ConstantStruct::get(resourceType, 
+      pr_name,
+      llvm::ConstantExpr::getBitCast(pr_obj, llvm::PointerType::getInt8PtrTy(C)),
+      pr_params,
+      llvm::ConstantAggregateZero::get(paddingType)
+    );
+
+    auto resourceAddress = CG->createUnnamedGlobalFrom(*D, resource, clang::CharUnits::One()*16);
+    auto resourceGV = cast<llvm::GlobalVariable>(resourceAddress.getPointer());
   }
 
   if (D->hasAttr<PirateCapabilityAttr>()) {
