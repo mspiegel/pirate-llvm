@@ -3930,6 +3930,9 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
 
     auto resourceAddress = CG->createUnnamedGlobalFrom(*D, resource, clang::CharUnits::One()*16);
     auto resourceGV = cast<llvm::GlobalVariable>(resourceAddress.getPointer());
+    auto sectionName = (".pirate.res." + resattr->getResType() + "." + resattr->getEnclaveName()).str();
+
+    resourceGV->setSection(sectionName);
   }
 
   if (D->hasAttr<PirateCapabilityAttr>()) {

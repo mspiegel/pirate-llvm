@@ -3454,7 +3454,7 @@ def PirateResource : InheritableAttr {
   let Spellings = [Clang<"pirate_resource">];
   let Subjects = SubjectList<[GlobalVar]>;
   let Documentation = [PirateResourceDocs];
-  let Args = [StringArgument<"ResName">, StringArgument<"ResType">];
+  let Args = [StringArgument<"ResName">, StringArgument<"ResType">, StringArgument<"EnclaveName">];
 }
 
 def PirateResourceParam : InheritableAttr {

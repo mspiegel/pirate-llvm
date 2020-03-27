@@ -1952,8 +1952,10 @@ static void handlePirateEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) 
 static void handlePirateResourceAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   StringRef ResName;
   StringRef ResType;
+  StringRef EnclaveName;
   SourceLocation NameLiteralLoc;
   SourceLocation TypeLiteralLoc;
+  SourceLocation EnclaveNameLoc;
 
   if (!S.checkStringLiteralArgumentAttr(AL, 0, ResName, &NameLiteralLoc))
     return;
@@ -1961,7 +1963,10 @@ static void handlePirateResourceAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (!S.checkStringLiteralArgumentAttr(AL, 1, ResType, &TypeLiteralLoc))
     return;
 
-  D->addAttr(PirateResourceAttr::Create(S.Context, ResName, ResType, AL));
+  if (!S.checkStringLiteralArgumentAttr(AL, 2, EnclaveName, &EnclaveNameLoc))
+    return;
+
+  D->addAttr(PirateResourceAttr::Create(S.Context, ResName, ResType, EnclaveName, AL));
 }
 
 static void handlePirateResourceParamAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
