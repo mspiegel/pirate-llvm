@@ -1229,8 +1229,6 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
     SectionIndexMap[CapStrTabSection] = addToSectionTable(CapStrTabSection);
   }
 
-
-
   for (MCSectionELF *Group : Groups) {
     align(Group->getAlignment());
 

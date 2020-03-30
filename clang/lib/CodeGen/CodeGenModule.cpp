@@ -3891,19 +3891,21 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
     }, /*packed*/true);
 
     auto pr_name = mkString(CG, resattr->getResName());
-    auto pr_type = mkString(CG, resattr->getResType());
-    auto pr_params = llvm::ConstantExpr::getNullValue(llvm::PointerType::get(entryType, 0));
     auto pr_obj = GV;
+    auto pr_params = llvm::ConstantExpr::getNullValue(llvm::PointerType::get(entryType, 0));
+
+    auto resEnclave = resattr->getEnclaveName();
 
     if (D->hasAttr<PirateResourceParamAttr>()) {
       std::vector<llvm::Constant *> entriesElts;    
 
       for (auto const& attr : D->specific_attrs<PirateResourceParamAttr>()) {
-
-        auto kp = mkString(CG, attr->getKey());
-        auto vp = mkString(CG, attr->getValue());
-        auto entry = ConstantStruct::get(entryType, {kp, vp});
-        entriesElts.push_back(entry);
+        if (attr->getEnclave().empty() || attr->getEnclave() == resEnclave) {
+          auto kp = mkString(CG, attr->getKey());
+          auto vp = mkString(CG, attr->getValue());
+          auto entry = ConstantStruct::get(entryType, {kp, vp});
+          entriesElts.push_back(entry);
+        }
       }
 
       entriesElts.push_back(llvm::ConstantAggregateZero::get(entryType));
@@ -3911,7 +3913,7 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
       auto entriesType = llvm::ArrayType::get(entryType, entriesElts.size());
       auto entries = ConstantArray::get(entriesType, entriesElts);
 
-      auto u = CG->createUnnamedGlobalFrom(*D, entries, clang::CharUnits::One()*16);
+      auto u = CG->createUnnamedGlobalFrom(*D, entries, clang::CharUnits::One()*8);
         // XXX: figure out how to compute alignment correctly
 
       auto v = cast<llvm::Constant>(u.getPointer());
@@ -3930,8 +3932,7 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
 
     auto resourceAddress = CG->createUnnamedGlobalFrom(*D, resource, clang::CharUnits::One()*16);
     auto resourceGV = cast<llvm::GlobalVariable>(resourceAddress.getPointer());
-    auto sectionName = (".pirate.res." + resattr->getResType() + "." + resattr->getEnclaveName()).str();
-
+    auto sectionName = (".pirate.res." + resattr->getResType() + "." + resEnclave).str();
     resourceGV->setSection(sectionName);
   }
 

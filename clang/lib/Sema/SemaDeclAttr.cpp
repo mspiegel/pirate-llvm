@@ -1970,10 +1970,8 @@ static void handlePirateResourceAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
 }
 
 static void handlePirateResourceParamAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
-  StringRef Key;
-  StringRef Value;
-  SourceLocation KeyLiteralLoc;
-  SourceLocation ValueLiteralLoc;
+  StringRef Key, Value, Enclave;
+  SourceLocation KeyLiteralLoc, ValueLiteralLoc, EnclaveLiteralLoc;
 
   if (!S.checkStringLiteralArgumentAttr(AL, 0, Key, &KeyLiteralLoc))
     return;
@@ -1981,7 +1979,10 @@ static void handlePirateResourceParamAttr(Sema &S, Decl *D, const ParsedAttr &AL
   if (!S.checkStringLiteralArgumentAttr(AL, 1, Value, &ValueLiteralLoc))
     return;
 
-  D->addAttr(PirateResourceParamAttr::Create(S.Context, Key, Value, AL));
+  if (AL.getNumArgs() == 3 && !S.checkStringLiteralArgumentAttr(AL, 2, Enclave, &EnclaveLiteralLoc))
+    return;
+
+  D->addAttr(PirateResourceParamAttr::Create(S.Context, Key, Value, Enclave, AL));
 }
 
 static void handlePirateCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
