@@ -7630,6 +7630,17 @@ static void processTypeAttrs(TypeProcessingState &state, QualType &type,
       break;
     }
 
+    case ParsedAttr::AT_PirateResourceType: {
+      ASTContext &Ctx = state.getSema().Context;
+      StringRef Str;
+      if (attr.isArgExpr(0))
+        Str = cast<StringLiteral>(attr.getArgAsExpr(0))->getString();
+      else
+        Str = attr.getArgAsIdent(0)->Ident->getName();
+      type = state.getAttributedType(PirateResourceTypeAttr::Create(Ctx, Str), type, type);
+      break;
+    }
+
     MS_TYPE_ATTRS_CASELIST:
       if (!handleMSPointerTypeQualifierAttr(state, attr, type))
         attr.setUsedAsTypeAttr();

@@ -3450,11 +3450,18 @@ def PirateCapability : InheritableAttr {
   let Args = [StringArgument<"Capability">];
 }
 
+def PirateResourceType : DeclOrTypeAttr {
+  let Spellings = [Clang<"pirate_resource_type">];
+  let Documentation = [PirateResourceDocs];
+  let Subjects = SubjectList<[Var, TypedefName]>;
+  let Args = [StringArgument<"TypeName">];
+}
+
 def PirateResource : InheritableAttr {
   let Spellings = [Clang<"pirate_resource">];
   let Subjects = SubjectList<[GlobalVar]>;
   let Documentation = [PirateResourceDocs];
-  let Args = [StringArgument<"ResName">, StringArgument<"ResType">, StringArgument<"EnclaveName">];
+  let Args = [StringArgument<"ResName">, StringArgument<"EnclaveName">];
 }
 
 def PirateResourceParam : InheritableAttr {

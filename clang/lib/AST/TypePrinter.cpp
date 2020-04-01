@@ -1497,6 +1497,7 @@ void TypePrinter::printAttributedAfter(const AttributedType *T,
   case attr::OpenCLLocalAddressSpace:
   case attr::OpenCLConstantAddressSpace:
   case attr::OpenCLGenericAddressSpace:
+  case attr::PirateResourceType:
     // FIXME: Update printAttributedBefore to print these once we generate
     // AttributedType nodes for them.
     break;

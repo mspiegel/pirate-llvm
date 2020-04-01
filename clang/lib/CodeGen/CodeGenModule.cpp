@@ -3868,12 +3868,36 @@ mkString(CodeGenModule *CG, StringRef str) {
 }
 
 static
+StringRef findPirateResourceType(const VarDecl *D) {
+  if (auto *attr = D->getAttr<PirateResourceTypeAttr>()) {
+    return attr->getTypeName();
+  }
+
+  auto T = D->getType();
+  while (auto *tdt = T->getAs<TypedefType>()) {
+    auto TDD = tdt->getDecl();
+    if (auto *attr = TDD->getAttr<PirateResourceTypeAttr>()) {
+      return attr->getTypeName();
+    } else {
+        T = tdt->getDecl()->getUnderlyingType();
+    }
+  }
+
+  return "";
+}
+
+static
 void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVariable *GV) {
 
   auto & C = CG->getLLVMContext();
   using namespace llvm;
   
-  if (auto *resattr = D->getAttr<PirateResourceAttr>()) {   
+  for (auto resattr : D->specific_attrs<PirateResourceAttr>() ) {   
+
+    StringRef resourceTypeName = findPirateResourceType(D);
+    if (resourceTypeName.empty()) {
+      return;
+    }
 
     auto entryType = StructType::get(C,
       {llvm::PointerType::getInt8PtrTy(C),
@@ -3932,7 +3956,7 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
 
     auto resourceAddress = CG->createUnnamedGlobalFrom(*D, resource, clang::CharUnits::One()*16);
     auto resourceGV = cast<llvm::GlobalVariable>(resourceAddress.getPointer());
-    auto sectionName = (".pirate.res." + resattr->getResType() + "." + resEnclave).str();
+    auto sectionName = (".pirate.res." + resourceTypeName + "." + resEnclave).str();
     resourceGV->setSection(sectionName);
   }
 

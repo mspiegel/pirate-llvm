@@ -1949,24 +1949,29 @@ static void handlePirateEnclaveMainAttr(Sema &S, Decl *D, const ParsedAttr &AL) 
   S.Diag(LiteralLoc, diag::err_unknown_pirate_enclave) << Name;
 }
 
+static void handlePirateResourceTypeAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  StringRef TypeName;
+  SourceLocation TypeNameLiteralLoc;
+
+  if (!S.checkStringLiteralArgumentAttr(AL, 0, TypeName, &TypeNameLiteralLoc))
+    return;
+
+  D->addAttr(PirateResourceTypeAttr::Create(S.Context, TypeName, AL));
+}
+
 static void handlePirateResourceAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   StringRef ResName;
-  StringRef ResType;
   StringRef EnclaveName;
   SourceLocation NameLiteralLoc;
-  SourceLocation TypeLiteralLoc;
   SourceLocation EnclaveNameLoc;
 
   if (!S.checkStringLiteralArgumentAttr(AL, 0, ResName, &NameLiteralLoc))
     return;
 
-  if (!S.checkStringLiteralArgumentAttr(AL, 1, ResType, &TypeLiteralLoc))
+  if (!S.checkStringLiteralArgumentAttr(AL, 1, EnclaveName, &EnclaveNameLoc))
     return;
 
-  if (!S.checkStringLiteralArgumentAttr(AL, 2, EnclaveName, &EnclaveNameLoc))
-    return;
-
-  D->addAttr(PirateResourceAttr::Create(S.Context, ResName, ResType, EnclaveName, AL));
+  D->addAttr(PirateResourceAttr::Create(S.Context, ResName, EnclaveName, AL));
 }
 
 static void handlePirateResourceParamAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
@@ -7351,6 +7356,10 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
 
   case ParsedAttr::AT_PirateResource:
     handlePirateResourceAttr(S, D, AL);
+    break;
+
+  case ParsedAttr::AT_PirateResourceType:
+    handlePirateResourceTypeAttr(S, D, AL);
     break;
   }
 }
