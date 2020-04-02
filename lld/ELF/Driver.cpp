@@ -1586,6 +1586,8 @@ static Symbol *addUndefined(StringRef name) {
       Undefined{nullptr, name, STB_GLOBAL, STV_DEFAULT, 0});
 }
 
+// This function stores a pirate section to the corresponding InputFile and
+// returns true if the section should be removed from the output ELF.
 template <typename ELFT>
 static bool readPirateSection(InputSectionBase *s) {
   if (s->name == ".pirate.enclaves")
@@ -1602,12 +1604,27 @@ static bool readPirateSection(InputSectionBase *s) {
   return true;
 }
 
+// This function handles a Pirate resource section with the prefix
+// ".pirate.res". If the section name has a suffix ".<enclave>" matching
+// the suffix we are currently linking for, strip that suffix and define
+// the symbol refered to in res_sym for each resource listed in the section.
+// Return true if the section should be removed from the output ELF (i.e.,
+// we're not linking for an enclave, or the section has the wrong enclave
+// suffix.
 template <typename ELFT>
 static bool readPirateResSection(InputSectionBase *s) {
-    auto resources = SafeArrayRef<Elf_Pirate_res<ELFT>>(s->name);
-    resources.safeAssign(s->getDataAs<Elf_Pirate_res<ELFT>>());
+  if (config->enclave.empty())
+    return true;
 
-    for (const Elf_Pirate_res<ELFT> &res : resources) {
+  StringRef dotEnclave = ("." + config->enclave).str();
+  if (!s->name.consume_back(dotEnclave))
+    return true;
+
+  auto resources = SafeArrayRef<Elf_Pirate_res<ELFT>>(s->name);
+  resources.safeAssign(s->getDataAs<Elf_Pirate_res<ELFT>>());
+
+  for (const Elf_Pirate_res<ELFT> &res : resources) {
+    if (res.gr_sym) {
       Symbol *sym = s->getFile<ELFT>()->getSymbols()[res.gr_sym];
       if (sym->isDefined())
         error("symbol '" + sym->getName() + "' cannot be redefined");
@@ -1620,8 +1637,9 @@ static bool readPirateResSection(InputSectionBase *s) {
                            sym->stOther, sym->type, /*value=*/0,
                            res.gr_size, bss});
     }
+  }
 
-    return false;
+  return false;
 }
 
 // This function is where all the optimizations of link-time
@@ -1755,6 +1773,10 @@ template <class ELFT> static uint32_t getAndFeatures() {
   return ret;
 }
 
+// This function determines the requirements for the Pirate enclave we are
+// currently linking for. For each such section, we record the supplied
+// capabilities. Exactly one section for the current enclave must have
+// declared a main function for this enclave.
 template <typename ELFT>
 void processPirateEnclave() {
   for (InputFile *f_ : objectFiles) {
@@ -1773,7 +1795,7 @@ void processPirateEnclave() {
 
         if (enclave->main && e.enc_main)
           error("Multiple main function specified for enclave " + enclave->name);
-        else
+        else if (e.enc_main)
           enclave->main = &f->getSymbol(e.enc_main);
 
         std::vector<StringRef> caps;
@@ -1784,6 +1806,9 @@ void processPirateEnclave() {
   }
 }
 
+// This function accumulates Pirate symbol requirements for all live symbols
+// from all input files. All Pirate sections for all input files must be
+// populated before this function is called.
 template <typename ELFT>
 void processPirateRequirements() {
   for (InputFile *f_ : objectFiles) {
@@ -1805,6 +1830,12 @@ void processPirateRequirements() {
   }
 }
 
+// This function resolves all references to "main" in the file where the
+// start symbol is defined with the main symbol for the current enclave.
+// In order to do this, this function must ensure that
+//   a) the current enclave is defined, and
+//   b) it has a main function defined.
+// For this reason, processPirateEnclave must be called first.
 void addPirateMain() {
   if (!enclave) {
     error("No enclave named " + config->enclave + " defined");
@@ -1827,6 +1858,10 @@ void addPirateMain() {
   }
 }
 
+// This function performs the final checks that all symbol requirements
+// are met by the current enclave, causing linking to fail otherwise.
+// Both processPirateEnclave and processPirateRequirements must be called
+// before this function runs.
 void checkPirateRequirements() {
   for (InputFile *f : objectFiles) {
     for (Symbol *s : f->getSymbols()) {

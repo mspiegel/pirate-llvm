@@ -318,7 +318,7 @@ template <class ELFT> void OutputSection::writeTo(uint8_t *buf) {
     InputSection *isec = sections[i];
     isec->writeTo<ELFT>(buf);
 
-    // Fill pirate between sections.
+    // Fill gaps between sections.
     if (nonZeroFiller) {
       uint8_t *start = buf + isec->outSecOff + isec->getSize();
       uint8_t *end;
