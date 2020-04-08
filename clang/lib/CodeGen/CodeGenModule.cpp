@@ -3892,12 +3892,18 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
   auto & C = CG->getLLVMContext();
   using namespace llvm;
   
+  if (!D->hasAttr<PirateResourceAttr>()) {
+    return;
+  }
+
+  auto resourceTypeName = findPirateResourceType(D);
+  if (resourceTypeName.empty()) {
+    return;
+  }
+
+
   for (auto resattr : D->specific_attrs<PirateResourceAttr>() ) {   
 
-    StringRef resourceTypeName = findPirateResourceType(D);
-    if (resourceTypeName.empty()) {
-      return;
-    }
 
     auto entryType = StructType::get(C,
       {llvm::PointerType::getInt8PtrTy(C),
@@ -3958,6 +3964,7 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
     auto resourceGV = cast<llvm::GlobalVariable>(resourceAddress.getPointer());
     auto sectionName = (".pirate.res." + resourceTypeName + "." + resEnclave).str();
     resourceGV->setSection(sectionName);
+    CG->addUsedGlobal(GV);
   }
 
   if (D->hasAttr<PirateCapabilityAttr>()) {
