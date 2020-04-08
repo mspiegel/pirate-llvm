@@ -172,7 +172,7 @@ static bool isReserved(InputSectionBase *sec) {
     StringRef s = sec->name;
     return s.startswith(".ctors") || s.startswith(".dtors") ||
            s.startswith(".init") || s.startswith(".fini") ||
-           s.startswith(".jcr");
+           s.startswith(".jcr") || s.startswith(".pirate.res");
   }
 }
 
