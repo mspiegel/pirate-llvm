@@ -42,9 +42,7 @@ template <class ELFT> struct Elf_Pirate_res {
   Elf_Addr gr_name;
   Elf_Addr gr_obj;
   Elf_Addr gr_params;
-  Elf_Word gr_size;
-  Elf_Half gr_align;
-  Elf_Half gr_sym;
+  Elf_Xword gr_params_len;
 };
 
 template <typename T> class SafeArrayRef : public ArrayRef<T> {

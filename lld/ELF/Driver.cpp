@@ -1623,22 +1623,6 @@ static bool readPirateResSection(InputSectionBase *s) {
   auto resources = SafeArrayRef<Elf_Pirate_res<ELFT>>(s->name);
   resources.safeAssign(s->getDataAs<Elf_Pirate_res<ELFT>>());
 
-  for (const Elf_Pirate_res<ELFT> &res : resources) {
-    if (res.gr_sym) {
-      Symbol *sym = s->getFile<ELFT>()->getSymbols()[res.gr_sym];
-      if (sym->isDefined())
-        error("symbol '" + sym->getName() + "' cannot be redefined");
-      auto *bss = make<BssSection>(".pirate.bss", res.gr_size,
-                                   res.gr_align);
-      bss->file = sym->file;
-      bss->markLive();
-      inputSections.push_back(bss);
-      sym->replace(Defined{sym->file, sym->getName(), sym->binding,
-                           sym->stOther, sym->type, /*value=*/0,
-                           res.gr_size, bss});
-    }
-  }
-
   return false;
 }
 

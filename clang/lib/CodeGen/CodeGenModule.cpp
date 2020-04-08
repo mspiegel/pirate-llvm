@@ -3901,9 +3901,9 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
     return;
   }
 
+  auto zero = llvm::ConstantInt::get(llvm::Type::getInt64Ty(C), 0);
 
   for (auto resattr : D->specific_attrs<PirateResourceAttr>() ) {   
-
 
     auto entryType = StructType::get(C,
       {llvm::PointerType::getInt8PtrTy(C),
@@ -3911,19 +3911,17 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
       }
     );
 
-    auto paddingType = llvm::ArrayType::get(llvm::Type::getInt8Ty(C), 8);
-
     auto resourceType = llvm::StructType::get(C, ArrayRef<llvm::Type*>{
       llvm::PointerType::getInt8PtrTy(C),
       llvm::PointerType::getInt8PtrTy(C),
       llvm::PointerType::get(entryType, 0),
-      paddingType,
+      llvm::Type::getInt64Ty(C),
     }, /*packed*/true);
 
     auto pr_name = mkString(CG, resattr->getResName());
     auto pr_obj = GV;
     auto pr_params = llvm::ConstantExpr::getNullValue(llvm::PointerType::get(entryType, 0));
-
+    auto pr_params_len = zero;
     auto resEnclave = resattr->getEnclaveName();
 
     if (D->hasAttr<PirateResourceParamAttr>()) {
@@ -3938,8 +3936,6 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
         }
       }
 
-      entriesElts.push_back(llvm::ConstantAggregateZero::get(entryType));
-
       auto entriesType = llvm::ArrayType::get(entryType, entriesElts.size());
       auto entries = ConstantArray::get(entriesType, entriesElts);
 
@@ -3948,23 +3944,21 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
 
       auto v = cast<llvm::Constant>(u.getPointer());
       
-      auto zero = llvm::ConstantInt::get(CG->getLLVMContext(), llvm::APInt(64, "0", 10));
       pr_params = llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, v, ArrayRef<llvm::Constant*>{zero, zero});
+      pr_params_len = llvm::ConstantInt::get(llvm::Type::getInt64Ty(C), entriesElts.size());
     }
-
 
     auto resource = llvm::ConstantStruct::get(resourceType, 
       pr_name,
       llvm::ConstantExpr::getBitCast(pr_obj, llvm::PointerType::getInt8PtrTy(C)),
       pr_params,
-      llvm::ConstantAggregateZero::get(paddingType)
+      pr_params_len
     );
 
     auto resourceAddress = CG->createUnnamedGlobalFrom(*D, resource, clang::CharUnits::One()*16);
     auto resourceGV = cast<llvm::GlobalVariable>(resourceAddress.getPointer());
     auto sectionName = (".pirate.res." + resourceTypeName + "." + resEnclave).str();
     resourceGV->setSection(sectionName);
-    CG->addUsedGlobal(GV);
   }
 
   if (D->hasAttr<PirateCapabilityAttr>()) {
