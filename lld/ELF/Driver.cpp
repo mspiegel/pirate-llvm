@@ -1605,12 +1605,10 @@ static bool readPirateSection(InputSectionBase *s) {
 }
 
 // This function handles a Pirate resource section with the prefix
-// ".pirate.res". If the section name has a suffix ".<enclave>" matching
-// the suffix we are currently linking for, strip that suffix and define
-// the symbol refered to in res_sym for each resource listed in the section.
-// Return true if the section should be removed from the output ELF (i.e.,
-// we're not linking for an enclave, or the section has the wrong enclave
-// suffix.
+// ".pirate.res". If the section name has a suffix ".<enclave>" matching the
+// suffix we are currently linking for, strip that suffix. Return true if the
+// section should be removed from the output ELF (i.e., we're not linking for
+// an enclave, or the section has the wrong enclave suffix).
 template <typename ELFT>
 static bool readPirateResSection(InputSectionBase *s) {
   if (config->enclave.empty())
@@ -1619,9 +1617,6 @@ static bool readPirateResSection(InputSectionBase *s) {
   StringRef dotEnclave = ("." + config->enclave).str();
   if (!s->name.consume_back(dotEnclave))
     return true;
-
-  auto resources = SafeArrayRef<Elf_Pirate_res<ELFT>>(s->name);
-  resources.safeAssign(s->getDataAs<Elf_Pirate_res<ELFT>>());
 
   return false;
 }
