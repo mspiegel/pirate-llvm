@@ -1971,7 +1971,17 @@ static void handlePirateResourceAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (!S.checkStringLiteralArgumentAttr(AL, 1, EnclaveName, &EnclaveNameLoc))
     return;
 
-  D->addAttr(PirateResourceAttr::Create(S.Context, ResName, EnclaveName, AL));
+  if (EnclaveName.empty()) {
+    D->addAttr(PirateResourceAttr::Create(S.Context, ResName, EnclaveName, AL));
+  } else {
+    for (auto const& entry : S.Context.Enclaves) {
+      if (entry == EnclaveName) {
+        D->addAttr(PirateResourceAttr::Create(S.Context, ResName, EnclaveName, AL));
+        return;
+      }
+    }
+    S.Diag(EnclaveNameLoc, diag::err_unknown_pirate_enclave) << EnclaveName;
+  }
 }
 
 static void handlePirateResourceParamAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
@@ -1987,7 +1997,17 @@ static void handlePirateResourceParamAttr(Sema &S, Decl *D, const ParsedAttr &AL
   if (AL.getNumArgs() == 3 && !S.checkStringLiteralArgumentAttr(AL, 2, Enclave, &EnclaveLiteralLoc))
     return;
 
-  D->addAttr(PirateResourceParamAttr::Create(S.Context, Key, Value, Enclave, AL));
+  if (Enclave.empty()) {
+    D->addAttr(PirateResourceParamAttr::Create(S.Context, Key, Value, Enclave, AL));
+  } else {
+    for (auto const& entry : S.Context.Enclaves) {
+      if (entry == Enclave) {
+        D->addAttr(PirateResourceParamAttr::Create(S.Context, Key, Value, Enclave, AL));
+        return;
+      }
+    }
+    S.Diag(EnclaveLiteralLoc, diag::err_unknown_pirate_enclave) << Enclave;
+  }
 }
 
 static void handlePirateCapabilityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
