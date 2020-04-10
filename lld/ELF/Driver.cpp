@@ -1614,13 +1614,16 @@ static bool readPirateResSection(InputSectionBase *s) {
   if (config->enclave.empty())
     return true;
 
-  size_t lastDot = s->name.find_last_of('.');
-  if(lastDot != std::string::npos && s->name.substr(0, lastDot) == ".pirate.res")
-    return false; // Retain `.pirate.res.<resource>` section
+  size_t nameParts = 0;
+  // ^ Should be 3 for ".pirate.res.<resource_type>" or 4 for
+  // ".pirate.res.<resource_type>.<enclave_name>".
+  for(char c : s->name)
+    if(c == '.')
+      ++nameParts;
 
   StringRef dotEnclave = ("." + config->enclave).str();
-  if (!s->name.consume_back(dotEnclave))
-    return true; // Drop `.pirate.res.<resource>.<enclave>` for wrong enclave
+  if (nameParts > 3 && !s->name.consume_back(dotEnclave))
+    return true;
 
   return false;
 }
