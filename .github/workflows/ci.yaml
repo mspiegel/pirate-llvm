@@ -95,8 +95,11 @@ jobs:
           path: images/llvm-ubuntu/pirate-llvm
       - name: Make pirateteam/llvm-ubuntu docker image
         run: docker build -t pirateteam/llvm-ubuntu images/llvm-ubuntu
+      - name: Make pirateteam/llvm-rh7 docker image
+        run: docker build -t pirateteam/llvm-rh7 images/llvm-rh7
       - name: Post docker images
         run: |
           echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
           docker push pirateteam/llvm-ubuntu
+          docker push pirateteam/llvm-rh7
         if: github.ref == 'refs/heads/master'
