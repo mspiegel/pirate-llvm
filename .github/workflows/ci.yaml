@@ -71,8 +71,8 @@ jobs:
             -e CCACHE_MAXSIZE=400M \
             pirateteam/build \
             ninja -j 2 install-distribution
-          cp -r `pwd`/dist `pwd`/images/llvm-ubuntu/
-          cp -r `pwd`/dist `pwd`/images/llvm-rh7/
+          cp -r `pwd`/dist `pwd`/images/llvm-ubuntu/pirate-llvm
+          cp -r `pwd`/dist `pwd`/images/llvm-rh7/pirate-llvm
 #      - name: Run tests
 #        run: |
 #          docker run -i \
