@@ -14,7 +14,7 @@ RUN curl -L https://sourceware.org/pub/valgrind/valgrind-3.15.0.tar.bz2 | tar xj
 RUN curl -L https://github.com/Kitware/CMake/releases/download/v3.16.5/cmake-3.16.5-Linux-x86_64.tar.gz | tar zxv
 RUN ln -s /root/cmake-3.16.5-Linux-x86_64/bin/cmake /usr/local/bin/cmake
 
-COPY dist /usr/local
+COPY pirate-llvm /usr/local
 RUN cd /usr/local/bin \
  && ln -s clang cc \
  && ln -s clang++ c++ \
