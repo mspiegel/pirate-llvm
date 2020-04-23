@@ -63,7 +63,7 @@ jobs:
             --memory=16G \
             --mount type=bind,src=`pwd`/build,dst=/root/build  \
             --mount type=bind,src=`pwd`/cache,dst=/root/cache \
-            --mount type=bind,src=`pwd`/images/llvm-ubuntu,dst=/root/dist \
+            --mount type=bind,src=`pwd`/dist,dst=/root/dist \
             --mount type=bind,src=`pwd`,dst=/root/pirate-llvm,ro \
             -w /root/build \
             -e CCACHE_DIR=/root/cache/ccache \
@@ -71,6 +71,8 @@ jobs:
             -e CCACHE_MAXSIZE=400M \
             pirateteam/build \
             ninja -j 2 install-distribution
+          cp -r `pwd`/dist/pirate-llvm `pwd`/images/llvm-ubuntu/pirate-llvm
+          cp -r `pwd`/dist/pirate-llvm `pwd`/images/llvm-rh7/pirate-llvm
 #      - name: Run tests
 #        run: |
 #          docker run -i \
@@ -93,8 +95,11 @@ jobs:
           path: images/llvm-ubuntu/pirate-llvm
       - name: Make pirateteam/llvm-ubuntu docker image
         run: docker build -t pirateteam/llvm-ubuntu images/llvm-ubuntu
+      - name: Make pirateteam/llvm-rh7 docker image
+        run: docker build -t pirateteam/llvm-rh7 images/llvm-rh7
       - name: Post docker images
         run: |
           echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
           docker push pirateteam/llvm-ubuntu
+          docker push pirateteam/llvm-rh7
         if: github.ref == 'refs/heads/master'
