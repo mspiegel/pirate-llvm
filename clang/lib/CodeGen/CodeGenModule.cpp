@@ -3891,7 +3891,16 @@ void EmitPirateMetadataGV(CodeGenModule *CG, const VarDecl *D, llvm::GlobalVaria
 
   auto & C = CG->getLLVMContext();
   using namespace llvm;
-  
+
+  if ((D->hasAttr<PirateEnclaveOnlyAttr>() || D->hasAttr<PirateCapabilityAttr>())
+  && !CG->getCodeGenOpts().DataSections) {
+    static bool reported = false;
+    if (!reported) {
+      CG->getDiags().Report(D->getLocation(), diag::warn_pirate_no_data_sections);
+      reported = true;
+    }
+  }
+
   if (!D->hasAttr<PirateResourceAttr>()) {
     return;
   }

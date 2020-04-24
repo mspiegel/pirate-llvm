@@ -1214,6 +1214,15 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
   FunctionArgList Args;
   QualType ResTy = BuildFunctionArgList(GD, Args);
 
+  if ((FD->hasAttr<PirateEnclaveOnlyAttr>() || FD->hasAttr<PirateCapabilityAttr>())
+  && !CGM.getCodeGenOpts().FunctionSections) {
+    static bool reported = false;
+    if (!reported) {
+       CGM.getDiags().Report(FD->getLocation(), diag::warn_pirate_no_function_sections);
+      reported = true;
+    }
+  }
+
   if (FD->hasAttr<PirateEnclaveMainAttr>()) {
     Fn->addFnAttr("pirate_enclave_main",FD->getAttr<PirateEnclaveMainAttr>()->getEnclaveName());
   }

@@ -256,6 +256,12 @@ def warn_alias_with_section : Warning<
   "as the %select{aliasee|resolver}2">,
   InGroup<IgnoredAttributes>;
 
+def warn_pirate_no_data_sections : Warning<
+  "restrictive pirate attribute used without -fdata-sections">;
+
+def warn_pirate_no_function_sections : Warning<
+  "restrictive pirate attribute used without -ffunction-sections">;
+
 let CategoryName = "Instrumentation Issue" in {
 def warn_profile_data_out_of_date : Warning<
   "profile data may be out of date: of %0 function%s0, %1 %plural{1:has|:have}1"
