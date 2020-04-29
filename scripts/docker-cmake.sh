@@ -10,12 +10,18 @@ case $type in
        exit
        ;;
 esac
+
+CMAKE_FLAGS=""
+
+# Use ld.lld if it is in path.
+if type -P ld.lld; then
+    CMAKE_FLAGS="-DLLVM_USE_LINKER=lld"
+fi
+
 LDFLAGS="-Wl,--gc-sections" \
-  cmake -G Ninja \
+  cmake \
       -DCMAKE_BUILD_TYPE=$type \
-      -DCMAKE_C_COMPILER=clang-9 \
       -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
-      -DCMAKE_CXX_COMPILER=clang++-9 \
       -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
       -DCMAKE_INSTALL_PREFIX=/root/dist/pirate-llvm \
       -DLLVM_BUILD_TOOLS=Off \
@@ -25,5 +31,7 @@ LDFLAGS="-Wl,--gc-sections" \
       -DLLVM_INCLUDE_EXAMPLES=Off \
       -DLLVM_INSTALL_TOOLCHAIN_ONLY=On \
       -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM" \
-      -DLLVM_USE_LINKER=lld \
+      $CMAKE_FLAGS \
       ../pirate-llvm/llvm
+
+#      \
