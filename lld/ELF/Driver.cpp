@@ -1860,7 +1860,7 @@ void checkPirateRequirements() {
         continue;
 
       if (r.enclave && enclave->name != r.enclave)
-        error("Symbol " + s->getName() + " needed, but can be linked on enclave "
+        error("Symbol " + toString(*s) + " needed, but can be linked on enclave "
             + StringRef(r.enclave) + " only");
 
       for (const auto &needCap : r.capabilities) {
@@ -1869,7 +1869,7 @@ void checkPirateRequirements() {
           if (needCap.equals(haveCap))
             met = true;
         if (!met)
-          error("Symbol " + s->getName() + " needed, but has unmet requirement "
+          error("Symbol " + toString(*s) + " needed, but has unmet requirement "
               + needCap);
       }
     }
