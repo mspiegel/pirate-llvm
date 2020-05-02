@@ -13,26 +13,32 @@ jobs:
         name: [ubuntu, centos7]
         include:
           - name: ubuntu
-            os: ubuntu
+            build-image-name: pirateteam/build-ubuntu-x86_64
+            build-image-dir:  images/build-ubuntu
+            llvm-image-name:  pirateteam/llvm-ubuntu-x86_64
+            llvm-image-dir:   images/llvm-ubuntu
           - name: centos7
-            os: centos7
+            build-image-name: pirateteam/build-centos7-x86_64
+            build-image-dir:  images/build-centos7
+            llvm-image-name:  pirateteam/llvm-centos7-x86_64
+            llvm-image-dir:   images/llvm-centos7
       fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Make pirateteam/build docker image
         run: |
-          docker build -t pirateteam/build-${{matrix.os}} images/build-${{matrix.os}}
-          docker save pirateteam/build-${{matrix.os}} | gzip > latest.tar.gz
+          docker build -t ${{matrix.build-image-name}} ${{matrix.build-image-dir}}
+          docker save ${{matrix.build-image-name}} | gzip > latest.tar.gz
       - name: Save build image artifact
         uses: actions/upload-artifact@v1
         with:
-          name: pirateteam_build_${{matrix.os}}
+          name: pirateteam_build_${{matrix.name}}
           path: latest.tar.gz
       - name: Post build docker image
         run: |
           echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
-          docker push pirateteam/build-${{matrix.os}}:${{github.event.release.tag_name}}
+          docker push ${{matrix.build-image-name}}:${{github.event.release.tag_name}}
         if: github.event_name == 'release'
       - name: Cache
         uses: actions/cache@v1
@@ -45,16 +51,15 @@ jobs:
         run: |
           mkdir -p build
           mkdir -p cache
-          mkdir -p dist
           docker run -i \
             --cpus=2 \
             --memory=16G \
             --mount type=bind,src=`pwd`/build,dst=/root/build  \
             --mount type=bind,src=`pwd`/cache,dst=/root/cache \
-            --mount type=bind,src=`pwd`/images/llvm-ubuntu,dst=/root/dist \
+            --mount type=bind,src=`pwd`/${{matrix.llvm-image-dir}},dst=/root/dist \
             --mount type=bind,src=`pwd`,dst=/root/pirate-llvm,ro \
             -w /root/build \
-            pirateteam/build-${{matrix.os}} \
+            ${{matrix.build-image-name}} \
             /root/pirate-llvm/scripts/docker-cmake.sh Release
       - name: Run build
         run: |
@@ -63,24 +68,25 @@ jobs:
             --memory=16G \
             --mount type=bind,src=`pwd`/build,dst=/root/build  \
             --mount type=bind,src=`pwd`/cache,dst=/root/cache \
-            --mount type=bind,src=`pwd`/dist,dst=/root/dist \
+            --mount type=bind,src=`pwd`/${{matrix.llvm-image-dir}},dst=/root/dist \
             --mount type=bind,src=`pwd`,dst=/root/pirate-llvm,ro \
             -w /root/build \
             -e CCACHE_DIR=/root/cache/ccache \
             -e CCACHE_COMPRESS=true \
             -e CCACHE_MAXSIZE=400M \
-            pirateteam/build-${{matrix.os}} \
+            ${{matrix.build-image-name}} \
             make -j 2 install-distribution
+          cd ${{matrix.llvm-image-dir}}
+          tar cfz $GITHUB_WORKSPACE/pirate-llvm-${{matrix.name}}.tgz pirate-llvm
       - name: Save LLVM dist
         uses: actions/upload-artifact@v1
         with:
-          name: pirate-llvm-${{ matrix.os }}
-          path: dist/pirate-llvm
-# TODO: Enable these once we are building LLVM
-#      - name: Make pirateteam/llvm docker image
-#        run: docker build -t pirateteam/llvm-${{matrix.os}} images/llvm-${{matrix.os}}
-#      - name: Post docker images
-#        run: |
-#          echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
-#          docker push pirateteam/llvm-${{matrix.os}}:${{github.event.release.tag_name}}
-#        if: github.event_name == 'release'
+          name: pirate-llvm-${{matrix.name}}
+          path: pirate-llvm-${{matrix.name}}.tgz
+      - name: Make pirateteam/llvm docker image
+        run: docker build -t ${{matrix.llvm-image-name}} ${{matrix.llvm-image-dir}}
+      - name: Post docker images
+        run: |
+          echo ${{ secrets.docker_password }} | docker login -u gapspirateteam --password-stdin
+          docker push ${{matrix.llvm-image-name}}:${{github.event.release.tag_name}}
+        if: github.event_name == 'release'
