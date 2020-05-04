@@ -75,7 +75,14 @@ jobs:
             -e CCACHE_COMPRESS=true \
             -e CCACHE_MAXSIZE=400M \
             ${{matrix.build-image-name}} \
-            make -j 2 install-distribution
+            make -j 2 \
+                install-clang \
+                install-clang-libraries \
+                install-clang-resource-headers \
+                install-lld \
+                install-lldb \
+                install-liblldb \
+                install-llvm-readelf
           cd ${{matrix.llvm-image-dir}}
           tar cfz $GITHUB_WORKSPACE/pirate-llvm-${{matrix.name}}.tgz pirate-llvm
       - name: Save LLVM dist
