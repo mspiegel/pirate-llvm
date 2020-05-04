@@ -14,7 +14,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # Install sphinx
-RUN pip3 install -U Sphinx
+RUN pip3 install --no-cache-dir -U Sphinx
 
 # Add links
 RUN ln -s /usr/bin/clang-9 /usr/local/bin/cc \
