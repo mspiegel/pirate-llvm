@@ -1454,14 +1454,18 @@ void AsmPrinter::emitPirateSections(Module &M) {
   }
 
   for (auto const& d : M.globals()) {
+
     if (d.hasAttribute("pirate_enclave_only")) {
       auto enclave = d.getAttribute("pirate_enclave_only").getValueAsString();
       requirements[getSymbol(&d)].first = enclave;
     }
 
-    if (d.hasAttribute("pirate_capabilities")) {
-      auto capability = d.getAttribute("pirate_capabilities").getValueAsString();
-      requirements[getSymbol(&d)].second.push_back(capability);
+    if (auto *caps = d.getMetadata("pirate_capabilities")) {
+      for (auto const& cap : caps->operands()) {
+        if (auto const* str = llvm::dyn_cast<MDString>(cap)) {
+          requirements[getSymbol(&d)].second.push_back(str->getString());
+        }
+      }
     }
 
     if (d.hasAttribute("pirate_resource_name") && d.hasAttribute("pirate_resource_type")) {
