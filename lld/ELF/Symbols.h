@@ -550,6 +550,7 @@ void Symbol::replace(const Symbol &newSym) {
   isPreemptible = old.isPreemptible;
   scriptDefined = old.scriptDefined;
   partition = old.partition;
+  pirateReqsIdx = old.pirateReqsIdx;
 
   // Symbol length is computed lazily. If we already know a symbol length,
   // propagate it.

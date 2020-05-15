@@ -84,6 +84,7 @@ Symbol *SymbolTable::insert(StringRef name) {
   sym->traced = false;
   sym->scriptDefined = false;
   sym->partition = 1;
+  sym->pirateReqsIdx = -1;
   return sym;
 }
 
