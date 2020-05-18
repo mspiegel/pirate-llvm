@@ -3,11 +3,12 @@
 
 #pragma pirate enclave declare(e)
 #pragma pirate capability declare(mycap)
-int aglobal __attribute__((pirate_capability("mycap")));
+int global __attribute__((pirate_capability("mycap")));
 
 int enclave(void)
 __attribute__((pirate_enclave_main("e")))
 {
-  return aglobal;
+  global = 0;
+  return 0;
 }
 // CHECK: error
