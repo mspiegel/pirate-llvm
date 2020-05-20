@@ -17,6 +17,7 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/LayoutOverrideSource.h"
 #include "clang/Frontend/MultiplexConsumer.h"
+#include "clang/Frontend/PropagateEnclaves.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/LiteralSupport.h"
@@ -171,8 +172,8 @@ FrontendAction::CreateWrappedASTConsumer(CompilerInstance &CI,
     return nullptr;
 
   // If there are no registered plugins we don't need to wrap the consumer
-  if (FrontendPluginRegistry::begin() == FrontendPluginRegistry::end())
-    return Consumer;
+  //if (FrontendPluginRegistry::begin() == FrontendPluginRegistry::end())
+  //  return Consumer;
 
   // If this is a code completion run, avoid invoking the plugin consumers
   if (CI.hasCodeCompletionConsumer())
@@ -209,6 +210,9 @@ FrontendAction::CreateWrappedASTConsumer(CompilerInstance &CI,
       }
     }
   }
+
+  PropagateAnnotationsAction propagate;
+  Consumers.push_back(propagate.CreateASTConsumer(CI, InFile));
 
   // Add to Consumers the main consumer, then all the plugins that go after it
   Consumers.push_back(std::move(Consumer));

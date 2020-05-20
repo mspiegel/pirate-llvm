@@ -37,6 +37,7 @@ add_clang_library(clangFrontend
   ModuleDependencyCollector.cpp
   MultiplexConsumer.cpp
   PrecompiledPreamble.cpp
+  PropagateEnclaves.cpp
   PrintPreprocessedOutput.cpp
   SerializedDiagnosticPrinter.cpp
   SerializedDiagnosticReader.cpp
